@@ -74,6 +74,12 @@ downloads the newest full package, never an older one. The deltas stay, because
 they are the update path, and `RELEASES` is pruned to name only what is actually
 there. A release carries one full package, a handful of deltas and the index.
 
+**Squirrel writes `RELEASES` with no newline on the end.** A `while read` loop
+over it drops the last line, which is the full package - the one entry an
+install too old for the deltas needs to find. v0.14.3 shipped that way and had
+its index repaired by hand. Anything that reads this file line by line needs
+`|| [ -n "$entry" ]` on the loop.
+
 This happens after packing, not before. Delete the old package first and there
 is nothing to write a delta against, which turns every update back into a sixty
 megabyte download.
