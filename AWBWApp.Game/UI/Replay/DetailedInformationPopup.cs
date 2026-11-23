@@ -396,8 +396,16 @@ namespace AWBWApp.Game.UI.Replay
 
             public ReplayController ReplayController { get; set; }
 
+            private Bindable<bool> showExactHitPoints;
+
             [Resolved]
             private NearestNeighbourTextureStore textureStore { get; set; }
+
+            [BackgroundDependencyLoader]
+            private void load(AWBWConfigManager configManager)
+            {
+                showExactHitPoints = configManager.GetBindable<bool>(AWBWSetting.ShowExactHitPoints);
+            }
 
             public UnitPopup()
             {
@@ -484,7 +492,8 @@ namespace AWBWApp.Game.UI.Replay
                 if (unit.HideHP)
                     return "?";
 
-                if (ReplayController == null)
+                //Exact hit points only exist in a replay, and can be turned off in visual settings.
+                if (ReplayController == null || showExactHitPoints?.Value == false)
                     return unit.HealthPoints.Value.ToString(CultureInfo.InvariantCulture);
 
                 if (ReplayController.TryGetExactHitPoints(unit.UnitID, out var exact))
