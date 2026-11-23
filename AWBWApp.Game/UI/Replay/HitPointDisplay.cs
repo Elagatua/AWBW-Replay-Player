@@ -3,7 +3,9 @@ using System.ComponentModel;
 namespace AWBWApp.Game.UI.Replay
 {
     /// <summary>
-    /// How much the tile info popup says about a unit's hit points.
+    /// How much to say about a unit's hit points. The tile info popup and the attack calculator
+    /// each have their own setting of this, because wanting the plain figure while hovering a
+    /// unit says nothing about what is wanted from a tooltip whose whole subject is uncertainty.
     /// </summary>
     public enum HitPointDisplay
     {

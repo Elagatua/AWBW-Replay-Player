@@ -6,6 +6,7 @@ using AWBWApp.Game.Game.Damage;
 using AWBWApp.Game.Game.Logic;
 using AWBWApp.Game.Game.Units;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Primitives;
@@ -38,6 +39,14 @@ namespace AWBWApp.Game.UI.Replay
         [Resolved]
         private DamageCalculator calculator { get; set; }
 
+        private Bindable<CalculatorHitPointDisplay> hitPointDisplay;
+
+        [BackgroundDependencyLoader]
+        private void load(AWBWConfigManager configManager)
+        {
+            hitPointDisplay = configManager.GetBindable<CalculatorHitPointDisplay>(AWBWSetting.CalculatorHitPoints);
+        }
+
         private readonly CombatantHeader attackerHeader;
         private readonly CombatantHeader defenderHeader;
         private readonly HitPointRangeLine attackerRange;
@@ -51,6 +60,7 @@ namespace AWBWApp.Game.UI.Replay
         private readonly OutcomeList exactAttackerOutcomes;
         private readonly OutcomeList exactDefenderOutcomes;
         private readonly FillFlowContainer shownSection;
+        private readonly SpriteText shownSectionLabel;
         private readonly FillFlowContainer exactSection;
 
         private bool isShowing;
@@ -103,7 +113,7 @@ namespace AWBWApp.Game.UI.Replay
                             Spacing = new Vector2(0, 4),
                             Children = new Drawable[]
                             {
-                                createSectionLabel("Using calculated HP values"),
+                                createSectionLabel("Using calculated HP values", out shownSectionLabel),
                                 createPair(
                                     shownAttackerOutcomes = new OutcomeList(),
                                     shownDefenderOutcomes = new OutcomeList())
@@ -117,7 +127,7 @@ namespace AWBWApp.Game.UI.Replay
                             Alpha = 0,
                             Children = new Drawable[]
                             {
-                                createSectionLabel("Using true HP"),
+                                createSectionLabel("Using true HP", out _),
                                 createPair(
                                     exactAttackerOutcomes = new OutcomeList(),
                                     exactDefenderOutcomes = new OutcomeList())
@@ -152,7 +162,8 @@ namespace AWBWApp.Game.UI.Replay
                 describe(controller.GetHitPointBelief(attacker.UnitID)),
                 describe(controller.GetHitPointBelief(defender.UnitID)),
                 describeExact(controller, attacker),
-                describeExact(controller, defender));
+                describeExact(controller, defender),
+                hitPointDisplay?.Value);
 
             if (signature != lastSignature)
             {
@@ -211,10 +222,27 @@ namespace AWBWApp.Game.UI.Replay
             attackerContext.BindTo(situation.Attacker, attackingPlayer);
             defenderContext.BindTo(situation.Defender, defendingPlayer);
 
+            //How much this tooltip is allowed to say, which is a setting of its own: wanting the
+            //plain figure while hovering a unit says nothing about what is wanted here, where
+            //uncertainty is the subject rather than an inconvenience.
+            var detail = hitPointDisplay?.Value ?? CalculatorHitPointDisplay.Both;
+            var showsTrueHitPoints = detail is CalculatorHitPointDisplay.True or CalculatorHitPointDisplay.Both;
+
             //What a person watching could work out, rather than the top of each unit's tenth. A
             //unit showing 8 is somewhere in 71 to 80, and often somewhere much narrower than that.
-            var attackerBelief = controller.GetHitPointBelief(attacker.UnitID) ?? HitPointBelief.ForDisplayed(attacker.HealthPoints.Value);
-            var defenderBelief = controller.GetHitPointBelief(defender.UnitID) ?? HitPointBelief.ForDisplayed(defender.HealthPoints.Value);
+            //The other two settings ask for something simpler: the board's own figures, or the
+            //replay's.
+            var attackerBelief = beliefFor(controller, attacker, detail);
+            var defenderBelief = beliefFor(controller, defender, detail);
+
+            //Named after what is in it. A section headed as calculated, holding figures nothing
+            //calculated, would be the label lying about its contents.
+            shownSectionLabel.Text = detail switch
+            {
+                CalculatorHitPointDisplay.Nominal => "Ending HP",
+                CalculatorHitPointDisplay.True => "Using true HP",
+                _ => "Using calculated HP values"
+            };
 
             var hasExactAttacker = tryGetExactHitPoints(controller, attacker, out var exactAttackerHitPoints);
             var hasExactDefender = tryGetExactHitPoints(controller, defender, out var exactDefenderHitPoints);
@@ -222,8 +250,8 @@ namespace AWBWApp.Game.UI.Replay
             //Said per unit rather than over the section, because the two sides are believed to
             //different degrees and a single span covering both would include values neither
             //of them could be.
-            attackerRange.BindTo(attackerBelief, hasExactAttacker ? exactAttackerHitPoints : null);
-            defenderRange.BindTo(defenderBelief, hasExactDefender ? exactDefenderHitPoints : null);
+            attackerRange.BindTo(attackerBelief, showsTrueHitPoints && hasExactAttacker ? exactAttackerHitPoints : null);
+            defenderRange.BindTo(defenderBelief, showsTrueHitPoints && hasExactDefender ? exactDefenderHitPoints : null);
 
             var shown = calculator.ResolveExchange(situation, attackerBelief, defenderBelief);
 
@@ -242,7 +270,9 @@ namespace AWBWApp.Game.UI.Replay
             //and a repeated block of identical bars is just noise.
             var showExact = false;
 
-            if (shown.Attack.CanAttack && hasExactAttacker && hasExactDefender)
+            //Only the setting that asks for both draws a second section. The one that asks for
+            //the true figures alone has them in the section above already.
+            if (detail == CalculatorHitPointDisplay.Both && shown.Attack.CanAttack && hasExactAttacker && hasExactDefender)
             {
                 var exact = calculator.ResolveExchange(situation, exactAttackerHitPoints, exactDefenderHitPoints);
 
@@ -270,6 +300,20 @@ namespace AWBWApp.Game.UI.Replay
                 list.SetOutcomes(outcomes);
             else
                 list.ClearOutcomes();
+        }
+
+        private static HitPointBelief beliefFor(ReplayController controller, DrawableUnit unit, CalculatorHitPointDisplay detail)
+        {
+            //Nothing but the board, so every unit sits exactly on its tenth.
+            if (detail == CalculatorHitPointDisplay.Nominal)
+                return HitPointBelief.Certain(unit.HealthPoints.Value * 10);
+
+            //The replay's own figure where it has one. Sonja's units, and anything it never wrote
+            //down, fall back to what could be worked out rather than to nothing.
+            if (detail == CalculatorHitPointDisplay.True && tryGetExactHitPoints(controller, unit, out var exact))
+                return HitPointBelief.Certain(exact);
+
+            return controller.GetHitPointBelief(unit.UnitID) ?? HitPointBelief.ForDisplayed(unit.HealthPoints.Value);
         }
 
         private static string describe(HitPointBelief belief) => belief == null ? "?" : $"{belief.Minimum}-{belief.Maximum}";
@@ -340,7 +384,7 @@ namespace AWBWApp.Game.UI.Replay
                 }
             };
 
-        private static Drawable createSectionLabel(string text) =>
+        private static Drawable createSectionLabel(string text, out SpriteText label) =>
             new Container
             {
                 Width = AttackCalculatorColumn.WIDTH * 2 + column_spacing,
@@ -355,7 +399,7 @@ namespace AWBWApp.Game.UI.Replay
                         Height = 1,
                         Colour = new Color4(70, 70, 70, 255)
                     },
-                    new SpriteText
+                    label = new SpriteText
                     {
                         Anchor = Anchor.BottomLeft,
                         Origin = Anchor.BottomLeft,

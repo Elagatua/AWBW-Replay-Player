@@ -56,8 +56,8 @@ The board, the desync checks and unit value all work in whole numbers.
 
 The one place the fraction is surfaced is the mouseover popup, via
 `ReplayController.TryGetExactHitPoints` — controlled by
-`AWBWSetting.ShowExactHitPoints` ("Show Exact HP in Tile Info" in Visual
-Settings, on by default). Getting there is harder than it looks,
+`AWBWSetting.TileInfoHitPoints` ("HP in Tile Info" in Visual Settings; the
+attack calculator has a setting of its own). Getting there is harder than it looks,
 because **actions only ever report hit points as integers** — the exact value is
 written down only in a turn's starting snapshot.
 

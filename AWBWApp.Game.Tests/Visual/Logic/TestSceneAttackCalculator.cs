@@ -1,9 +1,10 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using AWBWApp.Game.Helpers;
 using AWBWApp.Game.UI.Replay;
 using NUnit.Framework;
 using osu.Framework.Allocation;
+using osu.Framework.Graphics;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Testing;
@@ -27,6 +28,9 @@ namespace AWBWApp.Game.Tests.Visual.Logic
 
         [Resolved]
         private NearestNeighbourTextureStore textureStore { get; set; }
+
+        [Resolved]
+        private AWBWConfigManager config { get; set; }
 
         [SetUpSteps]
         public void SetUpSteps()
@@ -219,10 +223,95 @@ namespace AWBWApp.Game.Tests.Visual.Logic
             });
         }
 
+        /// <summary>
+        /// What the tooltip is actually showing. A hidden section keeps its drawables, so without
+        /// the visibility walk this would read out the headings of sections nobody can see.
+        /// </summary>
         private List<string> readTooltip() =>
-            popup.ChildrenOfType<SpriteText>().Select(x => x.Text.ToString()).ToList();
+            popup.ChildrenOfType<SpriteText>().Where(isVisible).Select(x => x.Text.ToString()).ToList();
 
-        private void setUpReplay(string attackerUnit, string defenderUnit, bool buildingUnderDefender, bool mountainBelowDefender = false)
+        private static bool isVisible(Drawable drawable)
+        {
+            for (var part = drawable; part != null; part = part.Parent)
+            {
+                if (part.Alpha <= 0)
+                    return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// How much this tooltip says is a setting of its own, with four answers: nothing but the
+        /// board, what a person watching could work out, what the replay really recorded, or the
+        /// last two together so one can be read against the other.
+        /// </summary>
+        [Test]
+        public void TestHowMuchItSaysIsASetting()
+        {
+            //An infantry against a damaged tank, so that the defender survives with a spread to
+            //compare. Anything heavier kills it outright, and one certain outcome looks the same
+            //however it was worked out.
+            setUpReplay("Infantry", "Tank", buildingUnderDefender: false, damagedDefender: true);
+
+            AddStep("Ask for both", () => config.SetValue(AWBWSetting.CalculatorHitPoints, CalculatorHitPointDisplay.Both));
+            showAttack();
+
+            AddAssert("Both sections are there", () =>
+            {
+                var text = readTooltip();
+
+                Assert.That(text.Any(x => x == "Using calculated HP values"), Is.True);
+                Assert.That(text.Any(x => x == "Using true HP"), Is.True);
+                return true;
+            });
+
+            AddStep("Ask for the true figures alone", () => config.SetValue(AWBWSetting.CalculatorHitPoints, CalculatorHitPointDisplay.True));
+            showAttack();
+
+            AddAssert("Only the true one is left", () =>
+            {
+                var text = readTooltip();
+
+                Assert.That(text.Any(x => x == "Using true HP"), Is.True);
+                Assert.That(text.Any(x => x == "Using calculated HP values"), Is.False, "the worked-out section was still there");
+                Assert.That(text.Any(x => x.Contains("HP range")), Is.False, "a range was still shown beside it");
+                return true;
+            });
+
+            AddStep("Ask for what could be worked out", () => config.SetValue(AWBWSetting.CalculatorHitPoints, CalculatorHitPointDisplay.Possible));
+            showAttack();
+
+            AddAssert("Only the worked-out one is left", () =>
+            {
+                var text = readTooltip();
+
+                Assert.That(text.Any(x => x == "Using calculated HP values"), Is.True);
+                Assert.That(text.Any(x => x == "Using true HP"), Is.False, "the replay's own figures were still shown");
+                Assert.That(text.Any(x => x.Contains("True HP")), Is.False);
+                Assert.That(text.Any(x => x.Contains("HP range")), Is.True, "the worked-out range went with them");
+                return true;
+            });
+
+            AddStep("Ask for nothing but the board", () => config.SetValue(AWBWSetting.CalculatorHitPoints, CalculatorHitPointDisplay.Nominal));
+            showAttack();
+
+            AddAssert("Neither is shown", () =>
+            {
+                var text = readTooltip();
+
+                Assert.That(text.Any(x => x.Contains("True HP")), Is.False);
+                Assert.That(text.Any(x => x.Contains("HP range")), Is.False, "a range was still worked out");
+
+                //And the section no longer claims to have calculated anything.
+                Assert.That(text.Any(x => x == "Ending HP"), Is.True);
+                return true;
+            });
+
+            AddStep("Put the setting back", () => config.SetValue(AWBWSetting.CalculatorHitPoints, CalculatorHitPointDisplay.Both));
+        }
+
+        private void setUpReplay(string attackerUnit, string defenderUnit, bool buildingUnderDefender, bool mountainBelowDefender = false, bool damagedDefender = false)
         {
             AddStep($"Load {attackerUnit} against {defenderUnit}", () =>
             {
@@ -232,6 +321,10 @@ namespace AWBWApp.Game.Tests.Visual.Logic
 
                 var attacker = CreateBasicReplayUnit(0, 0, attackerUnit, new Vector2I(1, 1));
                 var defender = CreateBasicReplayUnit(1, 1, defenderUnit, new Vector2I(2, 1));
+
+                //Damaged, so that there is a range to put a true figure beside in the first place.
+                if (damagedDefender)
+                    defender.HitPoints = 5;
 
                 turn.ReplayUnit.Add(attacker.ID, attacker);
                 turn.ReplayUnit.Add(defender.ID, defender);
