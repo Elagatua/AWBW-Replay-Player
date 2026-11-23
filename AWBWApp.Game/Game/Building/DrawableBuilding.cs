@@ -219,6 +219,12 @@ namespace AWBWApp.Game.Game.Building
             else
                 colour = Color4.White;
 
+            //baseTile is a copy of the Plain tile, drawn so that the transparent gaps in a building's
+            //sprite still show grass. It has to be shaded like the DrawableTile it sits on top of:
+            //fog only, never the "has acted" darkening, and on the same timing as that tile. Otherwise
+            //those gaps stay bright while the rest of the tile goes foggy.
+            baseTile.FadeColour(colour, 150, FogOfWarActive.Value ? Easing.OutQuint : Easing.InQuint);
+
             if (HasDoneAction.Value && (!FogOfWarActive.Value || (revealBuildingInFog?.Value ?? true)))
                 colour = colour.Darken(0.2f);
 
