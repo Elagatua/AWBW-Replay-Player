@@ -112,6 +112,71 @@ namespace AWBWApp.Game.Tests.Visual.Logic
             AddAssert("The tooltip has something in it", () => popup.DrawWidth > 0);
         }
 
+        /// <summary>
+        /// The ring and its lines, hidden and shown again while the fade out is still running.
+        /// </summary>
+        /// <remarks>
+        /// Flicking the modifier key, or dragging the cursor off the board and back, does exactly
+        /// this. Two steps rather than one, because the two transforms have to start on different
+        /// frames for them to overlap at all.
+        /// </remarks>
+        [Test]
+        public void TestTheIndicatorSurvivesAFlicker()
+        {
+            AttackCalculatorIndicator indicator = null;
+
+            AddStep("Put an indicator on the board", () =>
+            {
+                if (indicator != null)
+                    Remove(indicator, true);
+
+                Add(indicator = new AttackCalculatorIndicator());
+            });
+
+            AddStep("Show it", () => showIndicator(indicator));
+            AddUntilStep("It is there", () => indicator.Alpha >= 1);
+
+            AddStep("Hide it", () => indicator.HideAttack());
+            AddStep("Show it again before it has finished going", () => showIndicator(indicator));
+
+            AddUntilStep("It is still there", () => indicator.Alpha >= 1);
+        }
+
+        /// <summary>
+        /// The gesture has been seen to stop drawing itself for a whole session, while the tooltip
+        /// it drives carried on working. The cause is not known.
+        /// </summary>
+        /// <remarks>
+        /// So this does not reproduce it - it stands in for it. Whatever took the indicator off
+        /// screen, the gesture has to be able to put it back, which it cannot do if it decides
+        /// there is nothing to do by remembering it once asked. Hiding it from outside is the
+        /// cheapest way to write down that requirement.
+        /// </remarks>
+        [Test]
+        public void TestTheIndicatorCanBeBroughtBackAfterSomethingElseHidesIt()
+        {
+            AttackCalculatorIndicator indicator = null;
+
+            AddStep("Put an indicator on the board", () =>
+            {
+                if (indicator != null)
+                    Remove(indicator, true);
+
+                Add(indicator = new AttackCalculatorIndicator());
+            });
+
+            AddStep("Show it", () => showIndicator(indicator));
+            AddUntilStep("It is there", () => indicator.Alpha >= 1);
+
+            AddStep("Something takes it off screen", () => indicator.Alpha = 0);
+            AddStep("Use the gesture again", () => showIndicator(indicator));
+
+            AddUntilStep("It comes back", () => indicator.Alpha >= 1);
+        }
+
+        private static void showIndicator(AttackCalculatorIndicator indicator) =>
+            indicator.ShowAttack(new Vector2I(1, 1), new Vector2I(1, 1), new Vector2I(2, 1), true);
+
         [Test]
         public void TestHidingAndShowingAgain()
         {

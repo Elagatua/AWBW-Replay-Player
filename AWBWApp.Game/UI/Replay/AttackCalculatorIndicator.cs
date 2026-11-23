@@ -45,7 +45,7 @@ namespace AWBWApp.Game.UI.Replay
         private readonly Circle elbow;
         private readonly Container reticle;
 
-        private bool isShowing;
+        private bool wantsToBeShown;
 
         public AttackCalculatorIndicator()
         {
@@ -128,19 +128,24 @@ namespace AWBWApp.Game.UI.Replay
 
             this.FadeColour(targetHasUnit ? target_colour : no_target_colour, 80, Easing.OutQuint);
 
-            if (isShowing)
+            //Asking for the fade again costs nothing once it has run, so what this really guards
+            //against is the opposite: a flag saying this is on screen while it is not. Remembering
+            //only that it was asked to appear would make any such disagreement permanent, since
+            //the fade that would fix it is the one being skipped. Here the gesture puts itself
+            //back on screen the next time it is used.
+            if (wantsToBeShown && Alpha > 0)
                 return;
 
-            isShowing = true;
+            wantsToBeShown = true;
             this.FadeIn(80, Easing.OutQuint);
         }
 
         public void HideAttack()
         {
-            if (!isShowing)
+            if (!wantsToBeShown)
                 return;
 
-            isShowing = false;
+            wantsToBeShown = false;
             this.FadeOut(120, Easing.OutQuint);
         }
 
