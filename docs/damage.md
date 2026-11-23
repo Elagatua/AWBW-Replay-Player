@@ -177,6 +177,11 @@ it:
   somewhere the board contradicts, and the only way out of a contradiction is to
   forget the unit entirely.
 - **The displayed figure afterwards** rules out everything it contradicts.
+- **A CO power that moves a whole army's hit points** shifts every one of them by
+  the amount the action states, stopping at one hit point rather than at none.
+  Drake's power takes ten points off everything on a side at once; without this,
+  a line of infantry known to be whole would all widen to the whole tenth on the
+  same frame.
 - **A repair** shifts it by exactly 20 and clamps at 100 — so anything from 81 up
   lands exactly on full health, which is the only operation that *removes*
   uncertainty. It is a plain addition with no rounding, which is worth stating

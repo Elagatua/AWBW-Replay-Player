@@ -216,6 +216,78 @@ namespace AWBWApp.Game.Tests.Visual.Logic
         }
 
         /// <summary>
+        /// A power that takes a hit point off an entire army takes a known amount off each of
+        /// them, so an untouched unit is still known exactly afterwards.
+        /// </summary>
+        /// <remarks>
+        /// Reported from real use: Drake's power went off and every full-health infantry on the
+        /// board went from being known exactly to "somewhere in 81 to 90". They were at 100 and
+        /// the power takes exactly 10, so there was only ever one answer.
+        /// </remarks>
+        [Test]
+        public void TestAPowerThatDamagesAnArmyIsAKnownAmount()
+        {
+            AddStep("Drake's power goes off", () =>
+            {
+                var data = CreateBasicReplayData(2);
+
+                var first = CreateBasicTurnData(data);
+                data.TurnData.Add(first);
+
+                var tank = CreateBasicReplayUnit(0, 0, "Tank", new Vector2I(1, 1));
+                var infantry = CreateBasicReplayUnit(1, 1, "Infantry", new Vector2I(2, 1));
+
+                first.ReplayUnit.Add(tank.ID, tank);
+                first.ReplayUnit.Add(infantry.ID, infantry);
+
+                first.Actions.Add(new PowerAction
+                {
+                    CombatOfficerName = "Drake",
+                    PowerName = "Tsunami",
+                    IsSuperPower = false,
+                    PlayerWideChanges = new Dictionary<long, PowerAction.PlayerWideUnitChange>
+                    {
+                        { 1, new PowerAction.PlayerWideUnitChange { HPGain = -1 } }
+                    }
+                });
+
+                //And what the replay privately holds once it has: exactly nine, not somewhere in
+                //the nines.
+                var second = CreateBasicTurnData(data, 1);
+                data.TurnData.Add(second);
+
+                var tankAfter = tank.Clone();
+                var infantryAfter = infantry.Clone();
+                infantryAfter.HitPoints = 9f;
+
+                second.ReplayUnit.Add(tankAfter.ID, tankAfter);
+                second.ReplayUnit.Add(infantryAfter.ID, infantryAfter);
+
+                ReplayController.RunSetupActionsForTest(data, CreateBasicMap(5, 5));
+            });
+
+            AddAssert("The infantry is still known exactly", () =>
+            {
+                var belief = ReplayController.GetHitPointBelief(1, 0, 0);
+
+                Assert.That(belief, Is.Not.Null);
+                Assert.That(belief.Minimum, Is.EqualTo(90), $"the infantry was left believed to be {belief}");
+                Assert.That(belief.Maximum, Is.EqualTo(90));
+                return true;
+            });
+
+            AddAssert("And still is on the next turn", () =>
+            {
+                var belief = ReplayController.GetHitPointBelief(1, 1, -1);
+
+                Assert.That(belief, Is.Not.Null);
+                Assert.That(belief.IsCertain, Is.True, $"the infantry was left believed to be {belief}");
+                Assert.That(belief.Minimum, Is.EqualTo(90));
+                return true;
+            });
+        }
+
+        /// <summary>
         /// Nothing fires back at an indirect, so a unit that shoots one comes away untouched and
         /// still known exactly.
         /// </summary>
