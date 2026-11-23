@@ -33,6 +33,12 @@ namespace AWBWApp.Game.Game.Damage
         /// <summary>AWBW repairs in steps of exactly this, and never past full health.</summary>
         private const int repair_amount = 20;
 
+        /// <summary>
+        /// The lowest a CO power leaves a unit: one displayed hit point, never none. The action
+        /// that applies the change clamps the same way.
+        /// </summary>
+        private const int power_floor = 10;
+
         private readonly DamageCalculator calculator;
         private readonly UnitStorage unitStorage;
         private readonly COStorage coStorage;
@@ -79,6 +85,10 @@ namespace AWBWApp.Game.Game.Damage
             {
                 case AttackUnitAction attack:
                     recordAttack(context, attack);
+                    break;
+
+                case PowerAction power when power.PlayerWideChanges != null:
+                    recordPowerChanges(context, power);
                     break;
 
                 case EndTurnAction endTurn when endTurn.RepairedUnits != null:
@@ -238,6 +248,41 @@ namespace AWBWApp.Game.Game.Damage
 
             //Before the first thing that happened to it, a unit is as it entered the game.
             return found ?? changes[0].Belief;
+        }
+
+        /// <summary>
+        /// A power that moves every unit on one side moves them all by the same stated amount,
+        /// which is a step this can follow rather than guess at.
+        /// </summary>
+        /// <remarks>
+        /// It is worth following because of how much it would otherwise cost. Drake's power takes
+        /// a hit point off an entire army at once, and without this every one of those units is
+        /// something the tracker cannot account for - so a line of untouched infantry, known
+        /// exactly, all widen to the whole tenth on the same frame.
+        /// </remarks>
+        private void recordPowerChanges(ReplaySetupContext context, PowerAction power)
+        {
+            foreach (var change in power.PlayerWideChanges)
+            {
+                if (!change.Value.HPGain.HasValue || change.Value.HPGain.Value == 0)
+                    continue;
+
+                //Stated on the scale the board shows, as everything in an action is.
+                var delta = change.Value.HPGain.Value * 10;
+
+                foreach (var unit in context.Units)
+                {
+                    //Units in a transport are left alone, exactly as the action itself leaves them.
+                    if (unit.Value.PlayerID != change.Key || (unit.Value.BeingCarried ?? false))
+                        continue;
+
+                    if (!beliefs.TryGetValue(unit.Key, out var belief))
+                        continue;
+
+                    beliefs[unit.Key] = belief.WithChange(delta, power_floor);
+                    accountedFor.Add(unit.Key);
+                }
+            }
         }
 
         private void recordAttack(ReplaySetupContext context, AttackUnitAction attack)

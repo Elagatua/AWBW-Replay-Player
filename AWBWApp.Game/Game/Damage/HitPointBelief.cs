@@ -140,10 +140,15 @@ namespace AWBWApp.Game.Game.Damage
 
         /// <summary>
         /// Shifts the whole belief by a known amount: a repair, or the fixed damage a CO power
-        /// deals. Hitting the ceiling is the one thing that makes a unit's hit points <i>more</i>
-        /// certain, since everything at or above 80 repairs to exactly 100.
+        /// deals. Running into either end is the one thing that makes a unit's hit points
+        /// <i>more</i> certain, since everything at or above 80 repairs to exactly 100.
         /// </summary>
-        public HitPointBelief WithChange(int delta)
+        /// <param name="minimum">
+        /// How low this particular change can leave a unit. A power stops at one displayed hit
+        /// point rather than taking the unit off the board, and a belief that ignored that would
+        /// be describing a unit the game will not produce.
+        /// </param>
+        public HitPointBelief WithChange(int delta, int minimum = 0)
         {
             if (delta == 0)
                 return this;
@@ -151,7 +156,7 @@ namespace AWBWApp.Game.Game.Damage
             var result = new double[MAXIMUM + 1];
 
             foreach (var (hitPoints, probability) in Support)
-                result[Math.Clamp(hitPoints + delta, 0, MAXIMUM)] += probability;
+                result[Math.Clamp(hitPoints + delta, minimum, MAXIMUM)] += probability;
 
             return new HitPointBelief(result);
         }
