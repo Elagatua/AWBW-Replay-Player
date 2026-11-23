@@ -3,7 +3,8 @@ using System.ComponentModel;
 namespace AWBWApp.Game.UI.Replay
 {
     /// <summary>
-    /// How much the tile info popup says about a unit's hit points.
+    /// How much this program is willing to say about a unit's hit points, in the tile info popup
+    /// and in the attack calculator alike.
     /// </summary>
     public enum HitPointDisplay
     {

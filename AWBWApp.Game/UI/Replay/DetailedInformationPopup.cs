@@ -406,7 +406,7 @@ namespace AWBWApp.Game.UI.Replay
             [BackgroundDependencyLoader]
             private void load(AWBWConfigManager configManager)
             {
-                hitPointDisplay = configManager.GetBindable<HitPointDisplay>(AWBWSetting.TileInfoHitPoints);
+                hitPointDisplay = configManager.GetBindable<HitPointDisplay>(AWBWSetting.ShownHitPoints);
             }
 
             public UnitPopup()

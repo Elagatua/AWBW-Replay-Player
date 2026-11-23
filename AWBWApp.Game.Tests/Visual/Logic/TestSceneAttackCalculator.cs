@@ -28,6 +28,9 @@ namespace AWBWApp.Game.Tests.Visual.Logic
         [Resolved]
         private NearestNeighbourTextureStore textureStore { get; set; }
 
+        [Resolved]
+        private AWBWConfigManager config { get; set; }
+
         [SetUpSteps]
         public void SetUpSteps()
         {
@@ -222,7 +225,27 @@ namespace AWBWApp.Game.Tests.Visual.Logic
         private List<string> readTooltip() =>
             popup.ChildrenOfType<SpriteText>().Select(x => x.Text.ToString()).ToList();
 
-        private void setUpReplay(string attackerUnit, string defenderUnit, bool buildingUnderDefender, bool mountainBelowDefender = false)
+        /// <summary>
+        /// What the replay privately records is a setting, and the tooltip is held to it: below
+        /// the most detailed setting it says only what someone watching could have worked out.
+        /// </summary>
+        [Test]
+        public void TestTheTrueFiguresAreASetting()
+        {
+            setUpReplay("Tank", "Infantry", buildingUnderDefender: false, damagedDefender: true);
+
+            AddStep("Allow the true figures", () => config.SetValue(AWBWSetting.ShownHitPoints, HitPointDisplay.True));
+            showAttack();
+            AddAssert("One is shown", () => readTooltip().Any(x => x.Contains("True HP")));
+
+            AddStep("Allow only what the board shows", () => config.SetValue(AWBWSetting.ShownHitPoints, HitPointDisplay.Possible));
+            showAttack();
+            AddAssert("None is shown", () => readTooltip().All(x => !x.Contains("True HP")));
+
+            AddStep("Put the setting back", () => config.SetValue(AWBWSetting.ShownHitPoints, HitPointDisplay.True));
+        }
+
+        private void setUpReplay(string attackerUnit, string defenderUnit, bool buildingUnderDefender, bool mountainBelowDefender = false, bool damagedDefender = false)
         {
             AddStep($"Load {attackerUnit} against {defenderUnit}", () =>
             {
@@ -232,6 +255,10 @@ namespace AWBWApp.Game.Tests.Visual.Logic
 
                 var attacker = CreateBasicReplayUnit(0, 0, attackerUnit, new Vector2I(1, 1));
                 var defender = CreateBasicReplayUnit(1, 1, defenderUnit, new Vector2I(2, 1));
+
+                //Damaged, so that there is a range to put a true figure beside in the first place.
+                if (damagedDefender)
+                    defender.HitPoints = 5;
 
                 turn.ReplayUnit.Add(attacker.ID, attacker);
                 turn.ReplayUnit.Add(defender.ID, defender);

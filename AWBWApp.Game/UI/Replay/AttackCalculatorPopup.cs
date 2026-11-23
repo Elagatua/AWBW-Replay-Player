@@ -6,6 +6,7 @@ using AWBWApp.Game.Game.Damage;
 using AWBWApp.Game.Game.Logic;
 using AWBWApp.Game.Game.Units;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Primitives;
@@ -37,6 +38,14 @@ namespace AWBWApp.Game.UI.Replay
 
         [Resolved]
         private DamageCalculator calculator { get; set; }
+
+        private Bindable<HitPointDisplay> hitPointDisplay;
+
+        [BackgroundDependencyLoader]
+        private void load(AWBWConfigManager configManager)
+        {
+            hitPointDisplay = configManager.GetBindable<HitPointDisplay>(AWBWSetting.ShownHitPoints);
+        }
 
         private readonly CombatantHeader attackerHeader;
         private readonly CombatantHeader defenderHeader;
@@ -152,7 +161,8 @@ namespace AWBWApp.Game.UI.Replay
                 describe(controller.GetHitPointBelief(attacker.UnitID)),
                 describe(controller.GetHitPointBelief(defender.UnitID)),
                 describeExact(controller, attacker),
-                describeExact(controller, defender));
+                describeExact(controller, defender),
+                hitPointDisplay?.Value);
 
             if (signature != lastSignature)
             {
@@ -219,11 +229,16 @@ namespace AWBWApp.Game.UI.Replay
             var hasExactAttacker = tryGetExactHitPoints(controller, attacker, out var exactAttackerHitPoints);
             var hasExactDefender = tryGetExactHitPoints(controller, defender, out var exactDefenderHitPoints);
 
+            //The figures the replay privately records are a setting rather than a given. Below the
+            //most detailed setting this tooltip says only what someone watching the game could
+            //have worked out, which is the whole point of the ranges above.
+            var showsTrueHitPoints = hitPointDisplay?.Value == HitPointDisplay.True;
+
             //Said per unit rather than over the section, because the two sides are believed to
             //different degrees and a single span covering both would include values neither
             //of them could be.
-            attackerRange.BindTo(attackerBelief, hasExactAttacker ? exactAttackerHitPoints : null);
-            defenderRange.BindTo(defenderBelief, hasExactDefender ? exactDefenderHitPoints : null);
+            attackerRange.BindTo(attackerBelief, showsTrueHitPoints && hasExactAttacker ? exactAttackerHitPoints : null);
+            defenderRange.BindTo(defenderBelief, showsTrueHitPoints && hasExactDefender ? exactDefenderHitPoints : null);
 
             var shown = calculator.ResolveExchange(situation, attackerBelief, defenderBelief);
 
@@ -242,7 +257,7 @@ namespace AWBWApp.Game.UI.Replay
             //and a repeated block of identical bars is just noise.
             var showExact = false;
 
-            if (shown.Attack.CanAttack && hasExactAttacker && hasExactDefender)
+            if (showsTrueHitPoints && shown.Attack.CanAttack && hasExactAttacker && hasExactDefender)
             {
                 var exact = calculator.ResolveExchange(situation, exactAttackerHitPoints, exactDefenderHitPoints);
 

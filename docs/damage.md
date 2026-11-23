@@ -162,9 +162,12 @@ somewhere in **42–45** — not the 50 that reading its displayed 5 off the boa
 would suggest. That gap is often the difference between a follow-up killing and
 leaving a sliver.
 
-The tile info popup can show this too: **HP in Tile Info** offers the nominal
-figure the board shows, the possible range (two rows, most and least), or the
-true figure the replay records.
+One setting governs how much of this the program says out loud. **HP Display**
+offers the nominal figure the board shows, the possible range, or the true
+figure the replay records, and it covers both the tile info popup and the attack
+calculator. The calculator's *Using true HP* section and the true figures beside
+each range appear only at the last of those - everything else it shows is
+worked out from the board.
 
 [`HitPointBeliefTracker`](../AWBWApp.Game/Game/Damage/HitPointBeliefTracker.cs)
 carries this through the setup pass. Three things narrow a belief and one widens
