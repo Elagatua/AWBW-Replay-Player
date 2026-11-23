@@ -5,6 +5,7 @@ using AWBWApp.Game.API;
 using AWBWApp.Game.Game.Building;
 using AWBWApp.Game.Game.COs;
 using AWBWApp.Game.Game.Country;
+using AWBWApp.Game.Game.Damage;
 using AWBWApp.Game.Game.Tile;
 using AWBWApp.Game.Game.Units;
 using AWBWApp.Game.Helpers;
@@ -49,6 +50,7 @@ namespace AWBWApp.Game
         private UnitStorage unitStorage;
         private COStorage coStorage;
         private CountryStorage countryStorage;
+        private DamageChartStorage damageChartStorage;
 
         private InterruptDialogueOverlay interruptOverlay;
         private AWBWSessionHandler sessionHandler;
@@ -114,6 +116,12 @@ namespace AWBWApp.Game
             countryStorage = new CountryStorage();
             countryStorage.LoadStream(countriesJson);
             dependencies.Cache(countryStorage);
+
+            var damageChartJson = fileStorage.GetStream("Json/DamageChart");
+            damageChartStorage = new DamageChartStorage();
+            damageChartStorage.LoadStream(damageChartJson);
+            dependencies.Cache(damageChartStorage);
+            dependencies.Cache(new DamageCalculator(damageChartStorage));
 
             LoadComponentAsync(interruptOverlay = new InterruptDialogueOverlay(), Add);
             dependencies.Cache(interruptOverlay);

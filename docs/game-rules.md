@@ -9,6 +9,12 @@ visibility).
 Keep that split in mind: if you are tempted to compute a game rule, check first
 whether the replay already states the answer.
 
+**The one exception** is the damage calculator in
+[`Game/Damage/`](../AWBWApp.Game/Game/Damage/), which answers a question the
+replay cannot: not what happened, but what *would* happen if two units fought.
+It is never consulted to decide what did happen, and playback does not depend on
+it. See [damage.md](damage.md).
+
 ## Hit points
 
 ### Representation
@@ -278,8 +284,13 @@ knows a power is still up on later turns.
 
 Known limitation, stated in the source: *"We don't get information about unit
 damage increases"* — attack/defence boosts are described in `COs.json` for
-display but are never applied, because the replay already contains the damaged
-HP.
+display but are never applied during playback, because the replay already
+contains the damaged HP.
+
+The damage calculator does need those boosts, and deliberately does **not** read
+them from `COs.json`. It uses its own charts, which carry a value for every CO in
+all three power states and are transcribed from the reference the community
+trusts. See [damage.md](damage.md).
 
 ## Movement
 
