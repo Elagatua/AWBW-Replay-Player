@@ -59,6 +59,10 @@ namespace AWBWApp.Game.Tests.Visual.Components
         {
             random = new Random();
 
+            //DrawableUnit binds to both of these in its constructor, so neither can be null.
+            var country = countryStorage.GetCountryByCode("os");
+            var faceDirection = new Bindable<FaceDirection>(country.FaceDirection);
+
             var infantryData = unitStorage.GetUnitByCode("Infantry");
             infantryUnit = new ReplayUnit
             {
@@ -113,11 +117,11 @@ namespace AWBWApp.Game.Tests.Visual.Components
                     {
                         Alpha = 0
                     },
-                    infantry = new DrawableUnit(infantryData, infantryUnit, new Bindable<CountryData>(countryStorage.GetCountryByCode("os")), null)
+                    infantry = new DrawableUnit(infantryData, infantryUnit, new Bindable<CountryData>(country), faceDirection)
                     {
                         Alpha = 0
                     },
-                    tank = new DrawableUnit(tankData, tankUnit, new Bindable<CountryData>(countryStorage.GetCountryByCode("os")), null)
+                    tank = new DrawableUnit(tankData, tankUnit, new Bindable<CountryData>(country), faceDirection)
                     {
                         Alpha = 0
                     },
