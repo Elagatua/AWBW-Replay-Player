@@ -423,7 +423,7 @@ namespace AWBWApp.Game.IO
                         if (movePath != path)
                         {
                             readFileStream.Seek(0, SeekOrigin.Begin);
-                            using (var writeStream = underlyingStorage.GetStream($"{data.ReplayInfo.ID}.zip", FileAccess.Write, FileMode.Create))
+                            using (var writeStream = underlyingStorage.CreateFileSafely($"{data.ReplayInfo.ID}.zip"))
                                 readFileStream.CopyTo(writeStream);
                         }
                     }
@@ -441,7 +441,7 @@ namespace AWBWApp.Game.IO
                         using (var readFileStream = new FileStream(path, FileMode.Open, FileAccess.Read))
                         {
                             readFileStream.Seek(0, SeekOrigin.Begin);
-                            using (var writeStream = underlyingStorage.GetStream($"{data.ReplayInfo.ID}.awbw", FileAccess.Write, FileMode.Create))
+                            using (var writeStream = underlyingStorage.CreateFileSafely($"{data.ReplayInfo.ID}.awbw"))
                                 readFileStream.CopyTo(writeStream);
                         }
                     }
@@ -459,7 +459,7 @@ namespace AWBWApp.Game.IO
                         using (var readFileStream = new FileStream(path, FileMode.Open, FileAccess.Read))
                         {
                             readFileStream.Seek(0, SeekOrigin.Begin);
-                            using (var writeStream = underlyingStorage.GetStream($"{data.ReplayInfo.ID}", FileAccess.Write, FileMode.Create))
+                            using (var writeStream = underlyingStorage.CreateFileSafely($"{data.ReplayInfo.ID}"))
                                 readFileStream.CopyTo(writeStream);
                         }
                     }
@@ -494,7 +494,7 @@ namespace AWBWApp.Game.IO
                 data = jsonParser.ParseReplayZip(zipArchive);
 
                 //Store only after parsing it. So we don't save a bad replay
-                using (var writeStream = underlyingStorage.GetStream($"{data.ReplayInfo.ID}.zip", FileAccess.Write, FileMode.Create))
+                using (var writeStream = underlyingStorage.CreateFileSafely($"{data.ReplayInfo.ID}.zip"))
                 {
                     stream.Seek(0, SeekOrigin.Begin);
                     stream.CopyTo(writeStream);

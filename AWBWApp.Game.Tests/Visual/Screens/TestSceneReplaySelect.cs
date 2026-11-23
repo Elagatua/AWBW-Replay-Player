@@ -1,5 +1,4 @@
-﻿using System.IO;
-using System.Linq;
+﻿using System.Linq;
 using System.Threading.Tasks;
 using AWBWApp.Game.IO;
 using AWBWApp.Game.UI.Select;
@@ -66,20 +65,9 @@ namespace AWBWApp.Game.Tests.Visual.Screens
         {
             AddStep("Add Replay", () => Task.Run(() => replayManager.ParseThenStoreReplayStream(478996, fileStore.GetStream("Json/Replays/478996.zip"))));
 
-            //The replay is written on a background thread, so the file can already exist while the
-            //writer still holds it open. Reading it then throws rather than returning null, so treat
-            //that as "not ready yet" and keep waiting.
-            AddUntilStep("Wait Until Map is loaded", () =>
-            {
-                try
-                {
-                    return replayManager.GetReplayDataSync(478996) != null;
-                }
-                catch (IOException)
-                {
-                    return false;
-                }
-            });
+            //The replay is written on a background thread, but ReplayManager stores it atomically,
+            //so this either finds no file yet or a complete one - never a half-written zip.
+            AddUntilStep("Wait Until Map is loaded", () => replayManager.GetReplayDataSync(478996) != null);
         }
 
         private class TestReplayManager : ReplayManager
