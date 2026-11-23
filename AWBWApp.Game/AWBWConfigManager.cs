@@ -64,7 +64,8 @@ namespace AWBWApp.Game
             SetDefault(AWBWSetting.ShowTileCursor, true);
             SetDefault(AWBWSetting.ShowAnimationsForHiddenActions, true);
             SetDefault(AWBWSetting.SonjaHPVisiblity, SonjaHPVisibility.AlwaysVisible);
-            SetDefault(AWBWSetting.ShownHitPoints, HitPointDisplay.True);
+            SetDefault(AWBWSetting.TileInfoHitPoints, HitPointDisplay.True);
+            SetDefault(AWBWSetting.CalculatorHitPoints, HitPointDisplay.True);
             SetDefault(AWBWSetting.ShowClock, true);
             SetDefault(AWBWSetting.LockMapPosition, false);
 
@@ -103,7 +104,8 @@ namespace AWBWApp.Game
         SonjaHPVisiblity,
         ShowClock,
         LockMapPosition,
-        ShownHitPoints
+        TileInfoHitPoints,
+        CalculatorHitPoints
     }
 
     public enum MapSkin

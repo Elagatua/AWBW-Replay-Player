@@ -226,23 +226,46 @@ namespace AWBWApp.Game.Tests.Visual.Logic
             popup.ChildrenOfType<SpriteText>().Select(x => x.Text.ToString()).ToList();
 
         /// <summary>
-        /// What the replay privately records is a setting, and the tooltip is held to it: below
-        /// the most detailed setting it says only what someone watching could have worked out.
+        /// How much this tooltip says is a setting of its own, with three answers: everything the
+        /// replay knows, everything a person watching could work out, or nothing but the board.
         /// </summary>
         [Test]
-        public void TestTheTrueFiguresAreASetting()
+        public void TestHowMuchItSaysIsASetting()
         {
             setUpReplay("Tank", "Infantry", buildingUnderDefender: false, damagedDefender: true);
 
-            AddStep("Allow the true figures", () => config.SetValue(AWBWSetting.ShownHitPoints, HitPointDisplay.True));
+            AddStep("Allow the true figures", () => config.SetValue(AWBWSetting.CalculatorHitPoints, HitPointDisplay.True));
             showAttack();
-            AddAssert("One is shown", () => readTooltip().Any(x => x.Contains("True HP")));
+            AddAssert("A true figure is shown", () => readTooltip().Any(x => x.Contains("True HP")));
 
-            AddStep("Allow only what the board shows", () => config.SetValue(AWBWSetting.ShownHitPoints, HitPointDisplay.Possible));
+            AddStep("Allow only what could be worked out", () => config.SetValue(AWBWSetting.CalculatorHitPoints, HitPointDisplay.Possible));
             showAttack();
-            AddAssert("None is shown", () => readTooltip().All(x => !x.Contains("True HP")));
 
-            AddStep("Put the setting back", () => config.SetValue(AWBWSetting.ShownHitPoints, HitPointDisplay.True));
+            AddAssert("The range survives the true figure", () =>
+            {
+                var text = readTooltip();
+
+                Assert.That(text.Any(x => x.Contains("True HP")), Is.False, "the replay's own figure was still shown");
+                Assert.That(text.Any(x => x.Contains("HP range")), Is.True, "the worked-out range went with it");
+                return true;
+            });
+
+            AddStep("Allow nothing but the board", () => config.SetValue(AWBWSetting.CalculatorHitPoints, HitPointDisplay.Nominal));
+            showAttack();
+
+            AddAssert("Neither is shown", () =>
+            {
+                var text = readTooltip();
+
+                Assert.That(text.Any(x => x.Contains("True HP")), Is.False);
+                Assert.That(text.Any(x => x.Contains("HP range")), Is.False, "a range was still worked out");
+
+                //And the section no longer claims to have calculated anything.
+                Assert.That(text.Any(x => x == "Ending HP"), Is.True);
+                return true;
+            });
+
+            AddStep("Put the setting back", () => config.SetValue(AWBWSetting.CalculatorHitPoints, HitPointDisplay.True));
         }
 
         private void setUpReplay(string attackerUnit, string defenderUnit, bool buildingUnderDefender, bool mountainBelowDefender = false, bool damagedDefender = false)

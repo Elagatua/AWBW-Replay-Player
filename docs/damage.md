@@ -162,12 +162,16 @@ somewhere in **42–45** — not the 50 that reading its displayed 5 off the boa
 would suggest. That gap is often the difference between a follow-up killing and
 leaving a sliver.
 
-One setting governs how much of this the program says out loud. **HP Display**
-offers the nominal figure the board shows, the possible range, or the true
-figure the replay records, and it covers both the tile info popup and the attack
-calculator. The calculator's *Using true HP* section and the true figures beside
-each range appear only at the last of those - everything else it shows is
-worked out from the board.
+How much of this is said out loud is a setting, and there are two of them -
+**HP in Tile Info** and **HP in Damage Calculator** - because wanting the plain
+figure while hovering a unit says nothing about what is wanted from a tooltip
+whose whole subject is uncertainty. Both offer the same three answers:
+
+| | The calculator shows |
+|---|---|
+| Nominal | Nothing but the board: every unit sits exactly on its tenth, and the ending hit points are headed *Ending HP* |
+| Possible | The worked-out ranges, and nothing the replay privately knows |
+| True | Those, plus the *Using true HP* section and the real figure beside each range |
 
 [`HitPointBeliefTracker`](../AWBWApp.Game/Game/Damage/HitPointBeliefTracker.cs)
 carries this through the setup pass. Three things narrow a belief and one widens
