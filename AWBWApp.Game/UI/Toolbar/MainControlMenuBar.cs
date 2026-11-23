@@ -5,6 +5,7 @@ using AWBWApp.Game.Game.COs;
 using AWBWApp.Game.UI.Components.Menu;
 using AWBWApp.Game.UI.Interrupts;
 using AWBWApp.Game.UI.Notifications;
+using AWBWApp.Game.UI.Replay;
 using osu.Framework.Allocation;
 using osu.Framework.Configuration;
 using osu.Framework.Graphics;
@@ -53,7 +54,7 @@ namespace AWBWApp.Game.UI.Toolbar
                         new ToggleMenuItem("Show Animations for Hidden Actions", configManager.GetBindable<bool>(AWBWSetting.ShowAnimationsForHiddenActions)),
                         new ToggleMenuItem("Skip End Turn Animations", configManager.GetBindable<bool>(AWBWSetting.ReplaySkipEndTurn)),
                         new EnumMenuItem<SonjaHPVisibility>("Sonja HP Visibility", configManager.GetBindable<SonjaHPVisibility>(AWBWSetting.SonjaHPVisiblity)),
-                        new ToggleMenuItem("Show Exact HP in Tile Info", configManager.GetBindable<bool>(AWBWSetting.ShowExactHitPoints)),
+                        new EnumMenuItem<HitPointDisplay>("HP in Tile Info", configManager.GetBindable<HitPointDisplay>(AWBWSetting.TileInfoHitPoints)),
                         new ToggleMenuItem("Show Clock", configManager.GetBindable<bool>(AWBWSetting.ShowClock)),
                         new EnumMenuItem<Anchor>("Tile Info Popup Anchor", configManager.GetBindable<Anchor>(AWBWSetting.TileInfoPopupAnchor),
                             new[]

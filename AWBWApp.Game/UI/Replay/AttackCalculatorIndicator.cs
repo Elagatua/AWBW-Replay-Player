@@ -14,8 +14,15 @@ namespace AWBWApp.Game.UI.Replay
     /// being measured from, and a line running out to whichever tile the cursor is over.
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// The line bends where a direct unit would stop walking. See <see cref="AttackApproach"/> for
+    /// how that tile is chosen; the bend is there so that it is obvious which ground the numbers
+    /// in the tooltip are talking about.
+    /// </para>
+    /// <para>
     /// This lives inside <see cref="Game.Logic.GameMap"/> so that it scales with the camera along
     /// with everything else on the board. The tooltip does not; see <see cref="AttackCalculatorPopup"/>.
+    /// </para>
     /// </remarks>
     public partial class AttackCalculatorIndicator : CompositeDrawable
     {
@@ -23,12 +30,19 @@ namespace AWBWApp.Game.UI.Replay
         private const float ring_thickness = 2;
         private const float line_thickness = 2;
         private const float reticle_thickness = 2;
+        private const float elbow_radius = 3.5f;
+
+        //The walk up to the target is drawn back so that the shot itself stays the louder of the
+        //two. They are the same gesture, not two separate things.
+        private const float approach_alpha = 0.45f;
 
         private static readonly Color4 no_target_colour = new Color4(235, 235, 235, 255);
         private static readonly Color4 target_colour = new Color4(255, 90, 70, 255);
 
         private readonly CircularContainer ring;
-        private readonly Box line;
+        private readonly Box approachLine;
+        private readonly Box attackLine;
+        private readonly Circle elbow;
         private readonly Container reticle;
 
         private bool isShowing;
@@ -41,13 +55,15 @@ namespace AWBWApp.Game.UI.Replay
 
             InternalChildren = new Drawable[]
             {
-                //Drawn first so that it passes under the ring rather than over the attacking unit.
-                line = new Box
+                //Drawn first so that they pass under the ring rather than over the attacking unit.
+                approachLine = createSegment(),
+                attackLine = createSegment(),
+                elbow = new Circle
                 {
                     Anchor = Anchor.TopLeft,
-                    Origin = Anchor.CentreLeft,
-                    Height = line_thickness,
-                    Width = 0
+                    Origin = Anchor.Centre,
+                    Size = new Vector2(elbow_radius * 2),
+                    Alpha = 0
                 },
                 ring = new CircularContainer
                 {
@@ -87,25 +103,28 @@ namespace AWBWApp.Game.UI.Replay
         public override bool ReceivePositionalInputAt(Vector2 screenSpacePos) => false;
 
         /// <param name="source">The tile the attacking unit is standing on.</param>
+        /// <param name="attackFrom">
+        /// The tile the attack would be launched from. The same as <paramref name="source"/> for an
+        /// indirect, or whenever there is nothing to attack.
+        /// </param>
         /// <param name="target">The tile the cursor is currently over.</param>
         /// <param name="targetHasUnit">Whether <paramref name="target"/> holds a unit that could be attacked.</param>
-        public void ShowAttack(Vector2I source, Vector2I target, bool targetHasUnit)
+        public void ShowAttack(Vector2I source, Vector2I attackFrom, Vector2I target, bool targetHasUnit)
         {
             var from = GetTileCentre(source);
+            var via = GetTileCentre(attackFrom);
             var to = GetTileCentre(target);
-            var delta = to - from;
 
             ring.Position = from;
             reticle.Position = to;
 
-            line.Position = from;
-            line.Width = delta.Length;
-            line.Rotation = MathHelper.RadiansToDegrees(MathF.Atan2(delta.Y, delta.X));
+            setSegment(approachLine, from, via, approach_alpha);
+            setSegment(attackLine, via, to, 1);
 
-            //With the cursor still on the attacker the line has nowhere to go, and a stub of it
-            //would poke out through the far side of the ring.
-            line.Alpha = delta.Length > ring_radius ? 1 : 0;
-            reticle.Alpha = targetHasUnit ? 1 : 0;
+            //With nowhere to walk to there is no bend, and a dot sitting inside the ring would
+            //read as part of the ring rather than as a tile.
+            elbow.Position = via;
+            elbow.Alpha = attackFrom != source && attackFrom != target ? 1 : 0;
 
             this.FadeColour(targetHasUnit ? target_colour : no_target_colour, 80, Easing.OutQuint);
 
@@ -123,6 +142,28 @@ namespace AWBWApp.Game.UI.Replay
 
             isShowing = false;
             this.FadeOut(120, Easing.OutQuint);
+        }
+
+        private static Box createSegment() =>
+            new Box
+            {
+                Anchor = Anchor.TopLeft,
+                Origin = Anchor.CentreLeft,
+                Height = line_thickness,
+                Width = 0,
+                Alpha = 0
+            };
+
+        private static void setSegment(Box segment, Vector2 from, Vector2 to, float alpha)
+        {
+            var delta = to - from;
+
+            segment.Position = from;
+            segment.Width = delta.Length;
+            segment.Rotation = MathHelper.RadiansToDegrees(MathF.Atan2(delta.Y, delta.X));
+
+            //A stub shorter than the ring would only poke out through the far side of it.
+            segment.Alpha = delta.Length > ring_radius ? alpha : 0;
         }
 
         /// <summary>

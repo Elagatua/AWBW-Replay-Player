@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using AWBWApp.Game.Game.COs;
 using AWBWApp.Game.IO;
+using AWBWApp.Game.UI.Replay;
 using AWBWApp.Game.UI.Select;
 using osu.Framework.Bindables;
 using osu.Framework.Configuration;
@@ -63,7 +64,7 @@ namespace AWBWApp.Game
             SetDefault(AWBWSetting.ShowTileCursor, true);
             SetDefault(AWBWSetting.ShowAnimationsForHiddenActions, true);
             SetDefault(AWBWSetting.SonjaHPVisiblity, SonjaHPVisibility.AlwaysVisible);
-            SetDefault(AWBWSetting.ShowExactHitPoints, true);
+            SetDefault(AWBWSetting.TileInfoHitPoints, HitPointDisplay.True);
             SetDefault(AWBWSetting.ShowClock, true);
             SetDefault(AWBWSetting.LockMapPosition, false);
 
@@ -102,7 +103,7 @@ namespace AWBWApp.Game
         SonjaHPVisiblity,
         ShowClock,
         LockMapPosition,
-        ShowExactHitPoints
+        TileInfoHitPoints
     }
 
     public enum MapSkin

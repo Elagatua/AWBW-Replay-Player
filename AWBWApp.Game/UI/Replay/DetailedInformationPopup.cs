@@ -389,6 +389,8 @@ namespace AWBWApp.Game.UI.Replay
 
             private Container spriteContainer;
             private StatContainer unitHPCounter;
+            private StatContainer unitHighestHPCounter;
+            private StatContainer unitLowestHPCounter;
             private StatContainer unitAmmoCounter;
             private StatContainer unitFuelCounter;
 
@@ -396,7 +398,7 @@ namespace AWBWApp.Game.UI.Replay
 
             public ReplayController ReplayController { get; set; }
 
-            private Bindable<bool> showExactHitPoints;
+            private Bindable<HitPointDisplay> hitPointDisplay;
 
             [Resolved]
             private NearestNeighbourTextureStore textureStore { get; set; }
@@ -404,7 +406,7 @@ namespace AWBWApp.Game.UI.Replay
             [BackgroundDependencyLoader]
             private void load(AWBWConfigManager configManager)
             {
-                showExactHitPoints = configManager.GetBindable<bool>(AWBWSetting.ShowExactHitPoints);
+                hitPointDisplay = configManager.GetBindable<HitPointDisplay>(AWBWSetting.TileInfoHitPoints);
             }
 
             public UnitPopup()
@@ -437,6 +439,11 @@ namespace AWBWApp.Game.UI.Replay
                                 AutoSizeAxes = Axes.Both
                             },
                             unitHPCounter = new StatContainer("UI/HP"),
+                            //Only one of these is ever up at a time: either the single figure above,
+                            //or the two ends of the range. An alpha of zero takes a row out of the
+                            //flow entirely, so the popup closes up around whichever is hidden.
+                            unitHighestHPCounter = new StatContainer("UI/HP", StatSign.Most) { Alpha = 0 },
+                            unitLowestHPCounter = new StatContainer("UI/HP", StatSign.Least) { Alpha = 0 },
                             unitAmmoCounter = new StatContainer("UI/Ammo"),
                             unitFuelCounter = new StatContainer("UI/Fuel"),
                         }
@@ -462,7 +469,7 @@ namespace AWBWApp.Game.UI.Replay
                 unitSprite.Size *= 2;
 
                 Show();
-                unitHPCounter.SetText(getHealthText(unit));
+                updateHitPoints(unit);
                 unitAmmoCounter.BindTo(unit.Ammo);
                 unitFuelCounter.BindTo(unit.Fuel);
             }
@@ -471,47 +478,119 @@ namespace AWBWApp.Game.UI.Replay
             {
                 base.Update();
 
-                //Hit points are re-read every frame rather than bound, because the exact value depends
-                //on how far through the turn the replay is, not just on the unit.
+                //Hit points are re-read every frame rather than bound, because what is known about
+                //them depends on how far through the turn the replay is, not just on the unit.
                 if (boundToUnit != null)
-                    unitHPCounter.SetText(getHealthText(boundToUnit));
+                    updateHitPoints(boundToUnit);
 
                 //Hit points carry a decimal place, so this popup is no longer a fixed width. The parent
                 //auto-sizes, so growing here widens the whole popup smoothly.
-                Width = Math.Max(minimum_width, Math.Max(unitHPCounter.RequiredWidth, Math.Max(unitAmmoCounter.RequiredWidth, unitFuelCounter.RequiredWidth)));
+                var hitPointWidth = Math.Max(widthOf(unitHPCounter), Math.Max(widthOf(unitHighestHPCounter), widthOf(unitLowestHPCounter)));
+
+                Width = Math.Max(minimum_width, Math.Max(hitPointWidth, Math.Max(unitAmmoCounter.RequiredWidth, unitFuelCounter.RequiredWidth)));
             }
 
+            private static float widthOf(StatContainer counter) => counter.Alpha > 0 ? counter.RequiredWidth : 0;
+
             /// <summary>
-            /// Hit points to one decimal place. Unlike the board, which shows the whole number the game
-            /// itself shows, this is the real value AWBW tracks - when the replay records it. Where it
-            /// does not, the decimal is shown as '?' rather than guessed at.
+            /// What this popup is willing to say about a unit's hit points, which is a setting: the
+            /// whole number the game shows, the range a person watching could narrow it to, or the
+            /// figure the replay privately records.
             /// </summary>
-            private string getHealthText(DrawableUnit unit)
+            private void updateHitPoints(DrawableUnit unit)
             {
                 //Sonja's day to day hides unit health. The board already respects this; so should this.
                 if (unit.HideHP)
-                    return "?";
+                {
+                    showOneFigure("?");
+                    return;
+                }
 
-                //Exact hit points only exist in a replay, and can be turned off in visual settings.
-                if (ReplayController == null || showExactHitPoints?.Value == false)
-                    return unit.HealthPoints.Value.ToString(CultureInfo.InvariantCulture);
+                var nominal = unit.HealthPoints.Value.ToString(CultureInfo.InvariantCulture);
 
-                if (ReplayController.TryGetExactHitPoints(unit.UnitID, out var exact))
-                    return exact.ToString("0.0", CultureInfo.InvariantCulture);
+                //Anything past the number the game itself shows only exists inside a replay.
+                if (ReplayController == null || hitPointDisplay?.Value == HitPointDisplay.Nominal)
+                {
+                    showOneFigure(nominal);
+                    return;
+                }
 
-                //All that is known is the ceiling the rest of the game displays, so a unit shown as
-                //"10.?" is really somewhere in 9.1 - 10.0.
-                return $"{unit.HealthPoints.Value.ToString(CultureInfo.InvariantCulture)}.?";
+                if (hitPointDisplay?.Value == HitPointDisplay.True)
+                {
+                    if (ReplayController.TryGetExactHitPoints(unit.UnitID, out var exact))
+                        showOneFigure(exact.ToString("0.0", CultureInfo.InvariantCulture));
+                    else
+                        //All that is known is the ceiling the rest of the game displays, so a unit
+                        //shown as "10.?" is really somewhere in 9.1 - 10.0.
+                        showOneFigure($"{nominal}.?");
+
+                    return;
+                }
+
+                var belief = ReplayController.GetHitPointBelief(unit.UnitID);
+
+                //Nothing has been worked out about this unit, so there is nothing to add to the board.
+                if (belief == null)
+                {
+                    showOneFigure(nominal);
+                    return;
+                }
+
+                //Nothing has chipped away at this one, so both ends of the range are the same number
+                //and two rows would be two rows saying the same thing.
+                if (belief.Minimum == belief.Maximum)
+                {
+                    showOneFigure(formatHitPoints(belief.Maximum));
+                    return;
+                }
+
+                showRange(formatHitPoints(belief.Maximum), formatHitPoints(belief.Minimum));
+            }
+
+            /// <summary>
+            /// A whole tenth is written the way the board writes it. Anything else carries its
+            /// decimal, because that is the whole reason it is being shown.
+            /// </summary>
+            private static string formatHitPoints(int hitPoints) =>
+                hitPoints % 10 == 0
+                    ? (hitPoints / 10).ToString(CultureInfo.InvariantCulture)
+                    : (hitPoints / 10.0).ToString("0.0", CultureInfo.InvariantCulture);
+
+            private void showOneFigure(string text)
+            {
+                unitHPCounter.SetText(text);
+                unitHPCounter.Alpha = 1;
+                unitHighestHPCounter.Alpha = 0;
+                unitLowestHPCounter.Alpha = 0;
+            }
+
+            private void showRange(string most, string least)
+            {
+                unitHighestHPCounter.SetText(most);
+                unitLowestHPCounter.SetText(least);
+                unitHPCounter.Alpha = 0;
+                unitHighestHPCounter.Alpha = 1;
+                unitLowestHPCounter.Alpha = 1;
             }
 
             public void Reset()
             {
                 Hide();
-                unitHPCounter.SetText(string.Empty);
+                showOneFigure(string.Empty);
                 unitAmmoCounter.SetTo(0);
                 unitFuelCounter.SetTo(0);
                 boundToUnit = null;
             }
+        }
+
+        /// <summary>
+        /// Which end of a range a row is showing, marked on its icon.
+        /// </summary>
+        private enum StatSign
+        {
+            None,
+            Most,
+            Least
         }
 
         private partial class StatContainer : Container
@@ -519,6 +598,9 @@ namespace AWBWApp.Game.UI.Replay
             private const float edge_padding = 4;
             private const float icon_size = 22;
             private const float icon_to_text_spacing = 2;
+            private const float badge_size = 11;
+            private const float badge_bar_length = 7;
+            private const float badge_bar_thickness = 2;
 
             private Sprite sprite;
             private string texturePath;
@@ -528,7 +610,7 @@ namespace AWBWApp.Game.UI.Replay
 
             private IBindable<int> bindableReference;
 
-            public StatContainer(string texturePath)
+            public StatContainer(string texturePath, StatSign sign = StatSign.None)
             {
                 RelativeSizeAxes = Axes.X;
                 AutoSizeAxes = Axes.Y;
@@ -543,10 +625,14 @@ namespace AWBWApp.Game.UI.Replay
                         Origin = Anchor.CentreLeft,
                         Size = new Vector2(icon_size),
                         Position = new Vector2(edge_padding, 0),
-                        Child = sprite = new Sprite()
+                        Children = new Drawable[]
                         {
-                            Anchor = Anchor.Centre,
-                            Origin = Anchor.Centre,
+                            sprite = new Sprite()
+                            {
+                                Anchor = Anchor.Centre,
+                                Origin = Anchor.Centre,
+                            },
+                            createBadge(sign)
                         }
                     },
                     rollingCounter = new RollingCounter<int>()
@@ -581,6 +667,48 @@ namespace AWBWApp.Game.UI.Replay
                     var valueWidth = textCounter.Alpha > 0 ? textCounter.DrawWidth : rollingCounter.DrawWidth;
                     return edge_padding + icon_size + icon_to_text_spacing + valueWidth + edge_padding;
                 }
+            }
+
+            /// <summary>
+            /// The plus or minus sitting on the corner of the icon, telling the two ends of a range
+            /// apart. Drawn rather than stored as its own texture, so that it keeps its edges at
+            /// whatever size the popup is scaled to.
+            /// </summary>
+            private static Drawable createBadge(StatSign sign)
+            {
+                if (sign == StatSign.None)
+                    return Empty();
+
+                return new Container
+                {
+                    Anchor = Anchor.BottomRight,
+                    Origin = Anchor.BottomRight,
+                    Position = new Vector2(1, 1),
+                    Size = new Vector2(badge_size),
+                    Masking = true,
+                    CornerRadius = badge_size / 2,
+                    Children = new Drawable[]
+                    {
+                        new Box
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Colour = new Color4(20, 20, 20, 230)
+                        },
+                        new Box
+                        {
+                            Anchor = Anchor.Centre,
+                            Origin = Anchor.Centre,
+                            Size = new Vector2(badge_bar_length, badge_bar_thickness)
+                        },
+                        new Box
+                        {
+                            Anchor = Anchor.Centre,
+                            Origin = Anchor.Centre,
+                            Size = new Vector2(badge_bar_thickness, badge_bar_length),
+                            Alpha = sign == StatSign.Most ? 1 : 0
+                        }
+                    }
+                };
             }
 
             [BackgroundDependencyLoader]

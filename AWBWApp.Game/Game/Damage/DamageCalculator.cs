@@ -194,6 +194,64 @@ namespace AWBWApp.Game.Game.Damage
         }
 
         /// <summary>
+        /// Resolves the exchange across everything each unit's hit points could be, weighted by
+        /// how likely each is.
+        /// </summary>
+        /// <remarks>
+        /// Every value a belief still allows shares one displayed figure, so the damage rolls are
+        /// the same throughout and only the subtraction differs. The counterattack does not follow
+        /// suit - it is launched from whatever the defender has left, which is exactly what varies
+        /// here - so each starting pair has to be resolved on its own and the results mixed.
+        /// </remarks>
+        public AttackExchange ResolveExchange(AttackSituation situation, HitPointBelief attacker, HitPointBelief defender)
+        {
+            var attackerOutcomes = new Dictionary<int, double>();
+            var defenderOutcomes = new Dictionary<int, double>();
+
+            var attack = DamageResult.CANNOT_ATTACK;
+            var countered = false;
+            var expectedCounterDamage = 0d;
+            var minimumCounter = int.MaxValue;
+            var maximumCounter = 0;
+
+            foreach (var (attackerHitPoints, attackerProbability) in attacker.Support)
+            {
+                foreach (var (defenderHitPoints, defenderProbability) in defender.Support)
+                {
+                    var weight = attackerProbability * defenderProbability;
+                    var exchange = ResolveExchange(situation, attackerHitPoints, defenderHitPoints);
+
+                    attack = exchange.Attack;
+
+                    if (exchange.HasCounterAttack)
+                    {
+                        countered = true;
+                        expectedCounterDamage += exchange.ExpectedCounterDamage * weight;
+                        minimumCounter = Math.Min(minimumCounter, exchange.MinimumCounterDamage);
+                        maximumCounter = Math.Max(maximumCounter, exchange.MaximumCounterDamage);
+                    }
+
+                    foreach (var outcome in exchange.AttackerOutcomes)
+                        add(attackerOutcomes, outcome.HitPoints, outcome.Probability * weight);
+
+                    foreach (var outcome in exchange.DefenderOutcomes)
+                        add(defenderOutcomes, outcome.HitPoints, outcome.Probability * weight);
+                }
+            }
+
+            return new AttackExchange
+            {
+                Attack = attack,
+                HasCounterAttack = countered,
+                ExpectedCounterDamage = expectedCounterDamage,
+                MinimumCounterDamage = countered ? minimumCounter : 0,
+                MaximumCounterDamage = maximumCounter,
+                AttackerOutcomes = sorted(attackerOutcomes),
+                DefenderOutcomes = sorted(defenderOutcomes)
+            };
+        }
+
+        /// <summary>
         /// The whole number of hit points the game shows for a unit the replay has on its 0 to 100
         /// scale. Always rounded up, so anything still alive shows at least one.
         /// </summary>

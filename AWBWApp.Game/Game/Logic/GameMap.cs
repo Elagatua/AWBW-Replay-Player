@@ -93,6 +93,14 @@ namespace AWBWApp.Game.Game.Logic
         /// </summary>
         private long? attackCalculatorSourceID;
 
+        /// <summary>
+        /// Tiles the cursor has crossed since the gesture began, oldest first. A direct attack is
+        /// measured from the last of these that sits beside the target.
+        /// </summary>
+        private readonly List<Vector2I> attackCalculatorTrail = new List<Vector2I>();
+
+        private const int attack_calculator_trail_length = 32;
+
         private const int unit_deselect_delay = 500;
         private ScheduledDelegate unitDeselectDelegate;
         private bool hasShownMapOutdatedWarning;
@@ -417,6 +425,8 @@ namespace AWBWApp.Game.Game.Logic
                 return;
             }
 
+            recordAttackCalculatorTrail(tilePosition);
+
             //Latch onto the first unit hovered while the modifier is down, so that the cursor can
             //then wander off it without losing the attacker.
             if (attackCalculatorSourceID == null && hoveredUnit != null)
@@ -434,16 +444,39 @@ namespace AWBWApp.Game.Game.Logic
 
             var target = hoveredUnit != null && hoveredUnit != source ? hoveredUnit : null;
 
-            attackCalculatorIndicator.ShowAttack(source.MapPosition, tilePosition, target != null);
+            //A direct unit has to walk up to whatever it is attacking, and the tile it stops on is
+            //the ground that defends it when the counterattack lands. An indirect fires from where
+            //it stands, so for one of those the line has nowhere to bend.
+            var attackFrom = source.MapPosition;
+
+            if (target != null && !DamageCalculator.IsIndirect(source.UnitData))
+                attackFrom = AttackApproach.ChooseAttackFrom(source.MapPosition, target.MapPosition, MapSize, attackCalculatorTrail);
+
+            attackCalculatorIndicator.ShowAttack(source.MapPosition, attackFrom, tilePosition, target != null);
 
             if (target != null)
-                AttackPopup.ShowAttack(ReplayController, source, target, mousePosition);
+                AttackPopup.ShowAttack(ReplayController, source, target, attackFrom, mousePosition);
             else
                 AttackPopup.HideAttack();
         }
 
+        private void recordAttackCalculatorTrail(Vector2I tilePosition)
+        {
+            if (attackCalculatorTrail.Count > 0 && attackCalculatorTrail[^1] == tilePosition)
+                return;
+
+            attackCalculatorTrail.Add(tilePosition);
+
+            //Only the tail of this is ever read. Letting it grow for as long as the key is held
+            //would keep a tile the cursor crossed minutes ago in play.
+            if (attackCalculatorTrail.Count > attack_calculator_trail_length)
+                attackCalculatorTrail.RemoveAt(0);
+        }
+
         private void clearAttackCalculator()
         {
+            attackCalculatorTrail.Clear();
+
             if (attackCalculatorSourceID == null)
                 return;
 
