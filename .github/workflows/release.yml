@@ -126,10 +126,17 @@ jobs:
       run: |
         find Releases -name '*-full.nupkg' ! -name '*-${{ needs.version.outputs.version }}-full.nupkg' -print -delete
 
-        # An if rather than a test-and-print: this runs under bash -e, where a failing test at
-        # the end of a loop body takes the whole job with it - on the very line whose purpose is
-        # to find something missing.
-        while IFS= read -r entry; do
+        # Two things about this loop, both of which have already gone wrong once.
+        #
+        # The guard on read is because Squirrel writes RELEASES with no newline on the end, and
+        # read reports failure on a last line that is not terminated - so the loop drops it. That
+        # line is the full package, which is the one entry an install too old for the deltas needs
+        # to find.
+        #
+        # The if is because this runs under bash -e, where a failing test at the end of a loop
+        # body takes the whole job with it, on the very line whose purpose is to find something
+        # missing.
+        while IFS= read -r entry || [ -n "$entry" ]; do
           file=$(printf '%s' "$entry" | awk '{print $2}')
 
           if [ -f "Releases/$file" ]; then
