@@ -77,6 +77,7 @@ namespace AWBWApp.Game.Game.Logic
         private readonly ReplayBarWidget barWidget;
         private readonly ReplayPlayerList playerList;
         private readonly DetailedInformationPopup infoPopup;
+        private readonly AttackCalculatorPopup attackCalculatorPopup;
         private readonly Container errorContainer;
 
         private IBindable<bool> skipEndTurnBindable;
@@ -170,6 +171,9 @@ namespace AWBWApp.Game.Game.Logic
                             Anchor = Anchor.Centre,
                             Origin = Anchor.Centre,
                         },
+                        //Above the player list and the control bar, as it follows the cursor and can
+                        //end up flipped over either of them near the edge of the screen.
+                        attackCalculatorPopup = new AttackCalculatorPopup(),
                         errorContainer = new BlockingLayer
                         {
                             BlockKeyEvents = false,
@@ -201,6 +205,7 @@ namespace AWBWApp.Game.Game.Logic
             });
 
             Map.SetInfoPopup(infoPopup);
+            Map.SetAttackCalculatorPopup(attackCalculatorPopup);
 
             Map.OnLoadComplete += _ => cameraControllerWithGrid.FitMapToSpace();
 

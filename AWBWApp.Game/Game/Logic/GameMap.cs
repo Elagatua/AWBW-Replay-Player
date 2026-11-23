@@ -61,6 +61,7 @@ namespace AWBWApp.Game.Game.Logic
         protected Dictionary<long, DrawableUnit> Units;
 
         private readonly UnitRangeIndicator rangeIndicator;
+        private readonly AttackCalculatorIndicator attackCalculatorIndicator;
         protected TileCursor TileCursor;
 
         public string TerrainName;
@@ -83,6 +84,13 @@ namespace AWBWApp.Game.Game.Logic
         private Bindable<bool> showTileCursor;
 
         protected DetailedInformationPopup InfoPopup;
+        protected AttackCalculatorPopup AttackPopup;
+
+        /// <summary>
+        /// The unit the attack calculator is measuring from, latched when the modifier is first held.
+        /// Stored by id so that stepping the replay out from under it cannot leave a stale drawable here.
+        /// </summary>
+        private long? attackCalculatorSourceID;
 
         private const int unit_deselect_delay = 500;
         private ScheduledDelegate unitDeselectDelegate;
@@ -116,6 +124,7 @@ namespace AWBWApp.Game.Game.Logic
                 UnitsDrawable = new Container<DrawableUnit>(),
                 TileCursor = CreateTileCursor(),
                 rangeIndicator = new UnitRangeIndicator(),
+                attackCalculatorIndicator = new AttackCalculatorIndicator(),
                 effectAnimationController = new EffectAnimationController
                 {
                     Origin = Anchor.TopLeft,
@@ -216,6 +225,15 @@ namespace AWBWApp.Game.Game.Logic
 
             //Null in the editor, where there is no replay to read exact hit points out of.
             popup.ReplayController = ReplayController;
+        }
+
+        /// <summary>
+        /// Hands the map the tooltip to drive while the attack calculator gesture is held. Never set
+        /// in the editor, which is what keeps the gesture out of it entirely.
+        /// </summary>
+        public void SetAttackCalculatorPopup(AttackCalculatorPopup popup)
+        {
+            AttackPopup = popup;
         }
 
         public void SetToInitialGameState(ReplayData gameState, ReplayMap map)
@@ -375,6 +393,62 @@ namespace AWBWApp.Game.Game.Logic
 
             var cursor = inputManager.CurrentState.Mouse.Position;
             UpdateTileCursor(cursor);
+            updateAttackCalculator(cursor);
+        }
+
+        private void updateAttackCalculator(Vector2 mousePosition)
+        {
+            //The editor never gets a popup, so the gesture does not exist there.
+            if (AttackPopup == null)
+                return;
+
+            if (!inputManager.CurrentState.Keyboard.ControlPressed || !IsHovered)
+            {
+                clearAttackCalculator();
+                return;
+            }
+
+            if (!GetUnitAndTileFromMousePosition(ToLocalSpace(mousePosition), out var tilePosition, out _, out _, out var hoveredUnit))
+            {
+                //Off the board entirely. Keep whichever unit is latched, but stop drawing at nothing.
+                attackCalculatorIndicator.HideAttack();
+                AttackPopup.HideAttack();
+                return;
+            }
+
+            //Latch onto the first unit hovered while the modifier is down, so that the cursor can
+            //then wander off it without losing the attacker.
+            if (attackCalculatorSourceID == null && hoveredUnit != null)
+                attackCalculatorSourceID = hoveredUnit.UnitID;
+
+            if (attackCalculatorSourceID == null)
+                return;
+
+            //The replay can be stepped while the modifier is held, which may destroy the attacker.
+            if (!TryGetDrawableUnit(attackCalculatorSourceID.Value, out var source))
+            {
+                clearAttackCalculator();
+                return;
+            }
+
+            var target = hoveredUnit != null && hoveredUnit != source ? hoveredUnit : null;
+
+            attackCalculatorIndicator.ShowAttack(source.MapPosition, tilePosition, target != null);
+
+            if (target != null)
+                AttackPopup.ShowAttack(source, target, mousePosition);
+            else
+                AttackPopup.HideAttack();
+        }
+
+        private void clearAttackCalculator()
+        {
+            if (attackCalculatorSourceID == null)
+                return;
+
+            attackCalculatorSourceID = null;
+            attackCalculatorIndicator.HideAttack();
+            AttackPopup.HideAttack();
         }
 
         protected virtual void UpdateTileCursor(Vector2 mousePosition)
