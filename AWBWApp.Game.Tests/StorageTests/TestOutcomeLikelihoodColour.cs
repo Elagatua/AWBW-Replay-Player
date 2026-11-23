@@ -1,5 +1,9 @@
+using System.Linq;
+using AWBWApp.Game.Game.Damage;
 using AWBWApp.Game.UI.Replay;
 using NUnit.Framework;
+using osu.Framework.Graphics.Shapes;
+using osuTK.Graphics;
 
 namespace AWBWApp.Game.Tests.StorageTests
 {
@@ -51,6 +55,26 @@ namespace AWBWApp.Game.Tests.StorageTests
         {
             Assert.That(AttackCalculatorColumn.ForLikelihood(-1), Is.EqualTo(AttackCalculatorColumn.ForLikelihood(0)));
             Assert.That(AttackCalculatorColumn.ForLikelihood(2), Is.EqualTo(AttackCalculatorColumn.ForLikelihood(1)));
+        }
+
+        /// <summary>
+        /// A near-certain wreck is the one row the gradient does not get to have, since green is
+        /// the last thing it should be.
+        /// </summary>
+        [Test]
+        public void AWreckIsRedHoweverLikelyItIs()
+        {
+            foreach (var probability in new[] { 0.01, 0.5, 1.0 })
+            {
+                var bar = new OutcomeBar(new HitPointOutcome(0, probability));
+                var boxes = bar.Children.OfType<Box>().ToList();
+
+                Assert.That(boxes.Any(x => (Color4)x.Colour.TopLeft == AttackCalculatorColumn.DESTROYED), Is.True,
+                    $"a wreck at {probability} was not drawn in red");
+
+                Assert.That(boxes.Any(x => (Color4)x.Colour.TopLeft == AttackCalculatorColumn.ForLikelihood(probability)), Is.False,
+                    $"a wreck at {probability} took the gradient's colour");
+            }
         }
     }
 }

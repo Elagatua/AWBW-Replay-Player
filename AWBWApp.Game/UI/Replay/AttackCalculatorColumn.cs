@@ -49,7 +49,8 @@ namespace AWBWApp.Game.UI.Replay
         /// <remarks>
         /// This says nothing about whether the outcome is a good one. A column full of red is a
         /// spread with no favourite in it, not a column full of bad news - the left of each row
-        /// still says which outcome it is.
+        /// still says which outcome it is. The one row this is not asked about is a wreck, which
+        /// is always drawn in <see cref="DESTROYED"/>.
         /// </remarks>
         public static Color4 ForLikelihood(double probability)
         {
@@ -463,9 +464,10 @@ namespace AWBWApp.Game.UI.Replay
 
             var destroyed = outcome.HitPoints <= 0;
 
-            //The bar and its figure are coloured by how likely this outcome is, not by what it is.
-            //Which outcome it is, the left of the row already says.
-            var colour = AttackCalculatorColumn.ForLikelihood(outcome.Probability);
+            //Every surviving outcome is coloured by how likely it is rather than by what it is.
+            //A wreck is the exception: it stays red however long the odds, because the one row in
+            //the column that matters at a glance should not have to be read to be noticed.
+            var colour = destroyed ? AttackCalculatorColumn.DESTROYED : AttackCalculatorColumn.ForLikelihood(outcome.Probability);
 
             Children = new Drawable[]
             {
