@@ -52,9 +52,25 @@ namespace AWBWApp.Game.Game.Logic
         [Resolved(CanBeNull = true)]
         private NotificationOverlay notificationOverlay { get; set; }
 
+        [Resolved]
+        private UnitStorage unitStorage { get; set; }
+
+        [Resolved]
+        private TerrainTileStorage terrainTileStorage { get; set; }
+
+        [Resolved]
+        private DamageCalculator damageCalculator { get; set; }
+
         private List<RegisteredPower> registeredPowers = new List<RegisteredPower>();
 
         private ReplayData replayData;
+        private ReplayMap replayMap;
+
+        /// <summary>
+        /// What a person watching could work out about each unit's real hit points, as opposed to
+        /// what the replay privately records. See <see cref="HitPointBeliefTracker"/>.
+        /// </summary>
+        private HitPointBeliefTracker beliefTracker;
 
         public BindableInt CurrentTurnIndex { get; private set; } = new BindableInt(-1);
         public int CurrentDay => currentTurn.Day;
@@ -365,6 +381,7 @@ namespace AWBWApp.Game.Game.Logic
                     ClearReplay();
 
                 this.replayData = replayData;
+                replayMap = map;
 
                 Players.Clear();
                 foreach (var player in replayData.ReplayInfo.Players)
@@ -415,11 +432,12 @@ namespace AWBWApp.Game.Game.Logic
             });
         }
 
-        public void RunSetupActionsForTest(ReplayData replayData)
+        public void RunSetupActionsForTest(ReplayData replayData, ReplayMap map = null)
         {
             ClearReplay();
 
             this.replayData = replayData;
+            replayMap = map;
 
             Players.Clear();
             foreach (var player in replayData.ReplayInfo.Players)
@@ -439,10 +457,20 @@ namespace AWBWApp.Game.Game.Logic
             for (int i = 0; i < replayData.TurnData.Count; i++)
                 hitPointChangesPerTurn.Add(new Dictionary<long, (int, int)>());
 
+            beliefTracker = new HitPointBeliefTracker(damageCalculator, unitStorage, COStorage, buildingStorage, terrainTileStorage);
+            beliefTracker.Reset(replayMap);
+
             for (int i = 0; i < replayData.TurnData.Count; i++)
             {
                 var nextTurn = replayData.TurnData[i];
                 buildingDiscoveryController.RegisterNewTurn(setupContext);
+
+                var hitPointsBefore = new Dictionary<long, float>();
+                var changedThisAction = new HashSet<long>();
+
+                //Before anything syncs the context to it, so that the snapshot can still be told
+                //apart from what the previous turn's actions added up to.
+                beliefTracker.ObserveTurnStart(nextTurn, setupContext, i);
 
                 if (i != 0)
                 {
@@ -461,11 +489,10 @@ namespace AWBWApp.Game.Game.Logic
                 {
                     setupContext.SetupForTurn(nextTurn, i);
 
+                    var changesThisTurn = hitPointChangesPerTurn[i];
+
                     if (nextTurn.Actions == null || nextTurn.Actions.Count == 0)
                         continue;
-
-                    var changesThisTurn = hitPointChangesPerTurn[i];
-                    var hitPointsBefore = new Dictionary<long, float>();
 
                     for (int j = 0; j < setupContext.CurrentTurn.Actions.Count; j++)
                     {
@@ -475,10 +502,16 @@ namespace AWBWApp.Game.Game.Logic
 
                         setupContext.CurrentActionIndex = j;
                         var action = nextTurn.Actions[j];
+
+                        //Before, so that an attack is measured against the world it was launched
+                        //into rather than the wreckage it leaves.
+                        beliefTracker.BeforeAction(setupContext, action);
+
                         action.SetupAndUpdate(this, setupContext);
                         action.SuccessfullySetup = true;
 
-                        recordHitPointChanges(changesThisTurn, hitPointsBefore, setupContext.Units, j);
+                        recordHitPointChanges(changesThisTurn, hitPointsBefore, setupContext.Units, j, changedThisAction);
+                        beliefTracker.ObserveUnits(setupContext, changedThisAction, i, j);
                     }
                 }
                 catch (Exception e)
@@ -496,8 +529,10 @@ namespace AWBWApp.Game.Game.Logic
         /// Notes every unit whose hit points this action altered, so that <see cref="TryGetExactHitPoints"/>
         /// can later tell whether a turn's starting snapshot still describes a unit.
         /// </summary>
-        private static void recordHitPointChanges(Dictionary<long, (int First, int Last)> changes, Dictionary<long, float> before, Dictionary<long, ReplayUnit> after, int actionIndex)
+        private static void recordHitPointChanges(Dictionary<long, (int First, int Last)> changes, Dictionary<long, float> before, Dictionary<long, ReplayUnit> after, int actionIndex, HashSet<long> changedThisAction)
         {
+            changedThisAction.Clear();
+
             foreach (var unit in after)
             {
                 //A unit that did not exist before this action counts as changed: its hit points did
@@ -505,6 +540,7 @@ namespace AWBWApp.Game.Game.Logic
                 if (before.TryGetValue(unit.Key, out var previous) && previous == (unit.Value.HitPoints ?? 0))
                     continue;
 
+                changedThisAction.Add(unit.Key);
                 changes[unit.Key] = changes.TryGetValue(unit.Key, out var range) ? (range.First, actionIndex) : (actionIndex, actionIndex);
             }
         }
@@ -520,6 +556,20 @@ namespace AWBWApp.Game.Game.Logic
         /// two cases: the unit is changed again later in this turn, so the value in between was never
         /// recorded anywhere; or this is the last turn, and no snapshot follows it.
         /// </remarks>
+        /// <summary>
+        /// What a person watching the game could work out about a unit's real hit points at this
+        /// point in the replay, rather than the exact figure <see cref="TryGetExactHitPoints"/>
+        /// recovers from the snapshots. Null for a unit the replay has not introduced yet.
+        /// </summary>
+        public HitPointBelief GetHitPointBelief(long unitID) =>
+            beliefTracker?.GetBelief(unitID, CurrentTurnIndex.Value, currentActionIndex);
+
+        /// <summary>
+        /// The same, at an arbitrary point in the replay rather than wherever playback has reached.
+        /// </summary>
+        public HitPointBelief GetHitPointBelief(long unitID, int turnIndex, int actionIndex) =>
+            beliefTracker?.GetBelief(unitID, turnIndex, actionIndex);
+
         public bool TryGetExactHitPoints(long unitID, out float hitPoints)
         {
             hitPoints = 0;
@@ -1118,7 +1168,12 @@ namespace AWBWApp.Game.Game.Logic
         /// <param name="isCounterAttack">
         /// True when this is the defender hitting back. Only Sonja makes that differ.
         /// </param>
-        public AttackSituation CreateAttackSituation(DrawableUnit attacker, DrawableUnit defender, bool isCounterAttack = false)
+        /// <param name="attackerPosition">
+        /// The tile the attack is launched from, where that is not where the attacker is standing.
+        /// A direct unit walks up to its target before firing, and it is the tile it stops on that
+        /// defends it when the counterattack lands.
+        /// </param>
+        public AttackSituation CreateAttackSituation(DrawableUnit attacker, DrawableUnit defender, bool isCounterAttack = false, Vector2I? attackerPosition = null)
         {
             if (attacker?.OwnerID == null || defender?.OwnerID == null)
                 return null;
@@ -1129,13 +1184,13 @@ namespace AWBWApp.Game.Game.Logic
 
             return new AttackSituation
             {
-                Attacker = createCombatantState(attacker, attackingPlayer),
-                Defender = createCombatantState(defender, defendingPlayer),
+                Attacker = createCombatantState(attacker, attackingPlayer, attackerPosition ?? attacker.MapPosition),
+                Defender = createCombatantState(defender, defendingPlayer, defender.MapPosition),
                 IsCounterAttack = isCounterAttack
             };
         }
 
-        private CombatantState createCombatantState(DrawableUnit unit, PlayerInfo player)
+        private CombatantState createCombatantState(DrawableUnit unit, PlayerInfo player, Vector2I position)
         {
             return new CombatantState
             {
@@ -1147,8 +1202,8 @@ namespace AWBWApp.Game.Game.Logic
                 ComTowers = Map.CountBuildingsForPlayer("ComTower", player.ID),
                 Cities = Map.CountBuildingsForPlayer("City", player.ID),
                 Funds = player.Funds.Value,
-                Terrain = Map.GetDamageTerrainAt(unit.MapPosition),
-                TerrainStars = Map.GetTerrainDefenceAt(unit.MapPosition)
+                Terrain = Map.GetDamageTerrainAt(position),
+                TerrainStars = Map.GetTerrainDefenceAt(position)
             };
         }
 

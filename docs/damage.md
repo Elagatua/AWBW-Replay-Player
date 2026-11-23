@@ -126,6 +126,116 @@ The attacker's resulting spread is a mixture — for each way the attack can lan
 the counter is recomputed from whatever the defender has left, because that
 changes how hard it hits back.
 
+### Where the attack is fired from
+
+A direct unit almost never fires from where it is standing: it walks up to its
+target first, and the tile it stops on is the ground that defends it when the
+counter lands. So the terrain the attacker's side of a situation carries is **the
+tile the attack is launched from**, not the tile the unit currently occupies.
+
+The gesture lets the cursor choose it.
+[`AttackApproach`](../AWBWApp.Game/UI/Replay/AttackApproach.cs) takes whichever
+tile beside the target the cursor last crossed, and the indicator draws the line
+in two segments so that the bend shows which tile that was. Where the cursor
+never crossed one, it falls back to the nearest side of the target.
+
+Indirects are left alone. They cannot move and fire in the same turn, so there is
+nowhere for the line to bend, and the attacker's own tile is the right answer.
+
+Nothing here asks whether the unit could really get there — see the top of this
+page. A mountain in the way does not make the question less worth answering.
+
+## Hidden hit points
+
+A unit's real hit points run 0–100 and the board shows a tenth of that, rounded
+up. The exact figure is hidden until the replay is over — but it is not
+*unknowable*, and [`HitPointBelief`](../AWBWApp.Game/Game/Damage/HitPointBelief.cs)
+is what can be worked out about it, as a probability over every value it could be.
+
+The reason this works: the damage formula runs off the hit points both units
+**display**, which anyone watching can see. So the rolls an attack could have made
+are public. Only which roll landed is hidden, and the figure shown afterwards is
+evidence about that.
+
+A tank fresh from a base is exactly 100. Shot by another tank for 55–58, it is
+somewhere in **42–45** — not the 50 that reading its displayed 5 off the board
+would suggest. That gap is often the difference between a follow-up killing and
+leaving a sliver.
+
+[`HitPointBeliefTracker`](../AWBWApp.Game/Game/Damage/HitPointBeliefTracker.cs)
+carries this through the setup pass. Three things narrow a belief and one widens
+it:
+
+- **An attack** spreads it across that attack's damage rolls, and across the
+  counter's where one was invited. The counter follows the same rule as the
+  exchange above: no counter when either side is indirect. Taking one that never
+  happened is worse than taking none at all, because it lands the belief
+  somewhere the board contradicts, and the only way out of a contradiction is to
+  forget the unit entirely.
+- **The displayed figure afterwards** rules out everything it contradicts.
+- **A repair** shifts it by exactly 20 and clamps at 100 — so anything from 81 up
+  lands exactly on full health, which is the only operation that *removes*
+  uncertainty. It is a plain addition with no rounding, which is worth stating
+  because the home games round up first: across ten real replays, repairs left
+  units on every last digit, not just on zero.
+- **Anything else that moves a unit's hit points** throws the belief away and
+  starts again from the displayed figure.
+
+That last one is not a shortcut, it is the safety net, and it is load-bearing.
+Small changes do not shift the number on the board at all — a Mega Tank in the
+bundled replay quietly drops from 100 to 98 — so ruling values out would never
+catch them. Anything the tracker cannot account for, it admits to.
+
+For the same reason the tracker **refuses to model an attack when it does not
+know the terrain**. A damage spread computed against the wrong ground is worse
+than none: it is confidently wrong, and conditioning on the displayed figure only
+catches errors large enough to cross a tenth.
+
+### Rounded inside a turn, exact at its head
+
+A replay reports hit points two different ways, and mixing them up is the trap
+that this feature already fell into once.
+
+- **Inside a turn**, every action reports the figure the board shows: a whole
+  number, rounded up. A unit really holding 78 is reported as `8`.
+- **A turn's opening snapshot** carries the real value, `7.8`.
+
+So any comparison that spans the boundary has to round *both* sides first.
+Comparing them raw makes every damaged unit in the game look like it changed on
+every turn, which fires the safety net above, which throws away everything that
+had been worked out. The symptom is a tracker that always answers with the whole
+tenth — which reads as one that is simply not very clever, rather than as a bug.
+`TestAnAttackNarrowsTheRangeAndTheNextTurnKeepsIt` pins it.
+
+### The one reading of the real figure
+
+The snapshot is also the only place the replay writes the true hit points down,
+and the tracker reads them for exactly one purpose: to notice that a belief is
+**already wrong**, and throw it away.
+
+It never works anything out from them. The difference is the whole trap below —
+inference would make this silently perfect, while refusing to hold a contradicted
+belief only stops it lying. It earns its place because the tooltip prints the
+tracked range and the true figure *on the same line*: a range that does not
+contain the number beside it is not a cautious answer, it is a visibly wrong one.
+
+### The trap
+
+This runs in the setup pass, where the exact hit points are sitting in the same
+context it reads from. Only two things are ever taken off a unit: the figure the
+board shows, and *that* it changed. Never by how much. One careless line would
+make the tracker silently perfect, and perfect output looks like success.
+
+So `TestSceneHitPointBeliefs` tests it from the adversarial direction. It asserts
+**containment** — every figure the replay privately records falls inside the range
+allowed — and then, because a cheating tracker would pass that perfectly, it also
+asserts the tracker is honestly *uncertain* about most damaged units. The exact
+arithmetic is pinned separately by `TestHitPointBelief`.
+
+Both halves earned their keep: the containment test failed on its first three runs
+and found three real bugs, including the Mega Tank above and a repair the tracker
+was recording in the wrong place.
+
 ## State-dependent bonuses
 
 Two CO abilities cannot live in a chart, because they depend on how the match is

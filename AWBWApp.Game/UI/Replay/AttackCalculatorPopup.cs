@@ -8,6 +8,7 @@ using AWBWApp.Game.Game.Units;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osuTK;
@@ -39,6 +40,8 @@ namespace AWBWApp.Game.UI.Replay
 
         private readonly CombatantHeader attackerHeader;
         private readonly CombatantHeader defenderHeader;
+        private readonly HitPointRangeLine attackerRange;
+        private readonly HitPointRangeLine defenderRange;
         private readonly ContextStrip attackerContext;
         private readonly ContextStrip defenderContext;
         private readonly DamageLine attackerDamage;
@@ -85,6 +88,9 @@ namespace AWBWApp.Game.UI.Replay
                             attackerHeader = new CombatantHeader { FacesTowards = FaceDirection.Right },
                             defenderHeader = new CombatantHeader { FacesTowards = FaceDirection.Left }),
                         createPair(
+                            attackerRange = new HitPointRangeLine(),
+                            defenderRange = new HitPointRangeLine()),
+                        createPair(
                             attackerContext = new ContextStrip(),
                             defenderContext = new ContextStrip()),
                         createPair(
@@ -97,7 +103,7 @@ namespace AWBWApp.Game.UI.Replay
                             Spacing = new Vector2(0, 4),
                             Children = new Drawable[]
                             {
-                                createSectionLabel("Ending HP"),
+                                createSectionLabel("Using calculated HP values"),
                                 createPair(
                                     shownAttackerOutcomes = new OutcomeList(),
                                     shownDefenderOutcomes = new OutcomeList())
@@ -125,24 +131,34 @@ namespace AWBWApp.Game.UI.Replay
         //Pure decoration, and it sits right next to the cursor. Taking hover would fight the map.
         public override bool ReceivePositionalInputAt(Vector2 screenSpacePos) => false;
 
-        public void ShowAttack(ReplayController controller, DrawableUnit attacker, DrawableUnit defender, Vector2 screenSpaceMousePosition)
+        /// <param name="attackFrom">
+        /// The tile the attack is launched from. For a direct unit that is wherever the cursor
+        /// walked it to rather than where it is standing, and the ground there is what defends it
+        /// against the counterattack.
+        /// </param>
+        public void ShowAttack(ReplayController controller, DrawableUnit attacker, DrawableUnit defender, Vector2I attackFrom, Vector2 screenSpaceMousePosition)
         {
             if (controller == null)
                 return;
 
             //Rebuilding the whole tree every frame would be wasteful, and the answer only moves
-            //when one of these does.
+            //when one of these does. The believed ranges are in there because stepping through a
+            //turn can narrow them without the number on the board ever changing.
             var signature = string.Join('/', attacker.UnitID, defender.UnitID,
                 attacker.HealthPoints.Value, defender.HealthPoints.Value,
                 attacker.Ammo.Value, defender.Ammo.Value,
-                attacker.MapPosition, defender.MapPosition,
-                controller.CurrentTurnIndex.Value);
+                attacker.MapPosition, defender.MapPosition, attackFrom,
+                controller.CurrentTurnIndex.Value,
+                describe(controller.GetHitPointBelief(attacker.UnitID)),
+                describe(controller.GetHitPointBelief(defender.UnitID)),
+                describeExact(controller, attacker),
+                describeExact(controller, defender));
 
             if (signature != lastSignature)
             {
                 lastSignature = signature;
 
-                if (!rebuild(controller, attacker, defender))
+                if (!rebuild(controller, attacker, defender, attackFrom))
                 {
                     HideAttack();
                     return;
@@ -178,9 +194,9 @@ namespace AWBWApp.Game.UI.Replay
                 updatePosition();
         }
 
-        private bool rebuild(ReplayController controller, DrawableUnit attacker, DrawableUnit defender)
+        private bool rebuild(ReplayController controller, DrawableUnit attacker, DrawableUnit defender, Vector2I attackFrom)
         {
-            var situation = controller.CreateAttackSituation(attacker, defender);
+            var situation = controller.CreateAttackSituation(attacker, defender, false, attackFrom);
 
             if (situation == null)
                 return false;
@@ -188,15 +204,28 @@ namespace AWBWApp.Game.UI.Replay
             controller.Players.TryGetValue(attacker.OwnerID!.Value, out var attackingPlayer);
             controller.Players.TryGetValue(defender.OwnerID!.Value, out var defendingPlayer);
 
-            attackerHeader.BindTo(controller, attacker, attackingPlayer);
-            defenderHeader.BindTo(controller, defender, defendingPlayer);
+            //The attacker's row shows the ground it fires from, not the ground it set off from,
+            //so that the sprite and the defence stars under it are talking about the same tile.
+            attackerHeader.BindTo(controller, attacker, attackingPlayer, attackFrom);
+            defenderHeader.BindTo(controller, defender, defendingPlayer, defender.MapPosition);
             attackerContext.BindTo(situation.Attacker, attackingPlayer);
             defenderContext.BindTo(situation.Defender, defendingPlayer);
 
-            var shownAttackerHitPoints = attacker.HealthPoints.Value * 10;
-            var shownDefenderHitPoints = defender.HealthPoints.Value * 10;
+            //What a person watching could work out, rather than the top of each unit's tenth. A
+            //unit showing 8 is somewhere in 71 to 80, and often somewhere much narrower than that.
+            var attackerBelief = controller.GetHitPointBelief(attacker.UnitID) ?? HitPointBelief.ForDisplayed(attacker.HealthPoints.Value);
+            var defenderBelief = controller.GetHitPointBelief(defender.UnitID) ?? HitPointBelief.ForDisplayed(defender.HealthPoints.Value);
 
-            var shown = calculator.ResolveExchange(situation, shownAttackerHitPoints, shownDefenderHitPoints);
+            var hasExactAttacker = tryGetExactHitPoints(controller, attacker, out var exactAttackerHitPoints);
+            var hasExactDefender = tryGetExactHitPoints(controller, defender, out var exactDefenderHitPoints);
+
+            //Said per unit rather than over the section, because the two sides are believed to
+            //different degrees and a single span covering both would include values neither
+            //of them could be.
+            attackerRange.BindTo(attackerBelief, hasExactAttacker ? exactAttackerHitPoints : null);
+            defenderRange.BindTo(defenderBelief, hasExactDefender ? exactDefenderHitPoints : null);
+
+            var shown = calculator.ResolveExchange(situation, attackerBelief, defenderBelief);
 
             attackerDamage.SetDamage(shown.Attack.CanAttack, shown.Attack.MinimumDamage, shown.Attack.MaximumDamage);
             defenderDamage.SetDamage(shown.HasCounterAttack, shown.MinimumCounterDamage, shown.MaximumCounterDamage);
@@ -213,9 +242,7 @@ namespace AWBWApp.Game.UI.Replay
             //and a repeated block of identical bars is just noise.
             var showExact = false;
 
-            if (shown.Attack.CanAttack &&
-                tryGetExactHitPoints(controller, attacker, out var exactAttackerHitPoints) &&
-                tryGetExactHitPoints(controller, defender, out var exactDefenderHitPoints))
+            if (shown.Attack.CanAttack && hasExactAttacker && hasExactDefender)
             {
                 var exact = calculator.ResolveExchange(situation, exactAttackerHitPoints, exactDefenderHitPoints);
 
@@ -244,6 +271,11 @@ namespace AWBWApp.Game.UI.Replay
             else
                 list.ClearOutcomes();
         }
+
+        private static string describe(HitPointBelief belief) => belief == null ? "?" : $"{belief.Minimum}-{belief.Maximum}";
+
+        private static string describeExact(ReplayController controller, DrawableUnit unit) =>
+            tryGetExactHitPoints(controller, unit, out var hitPoints) ? hitPoints.ToString(CultureInfo.InvariantCulture) : "?";
 
         private static bool sameOutcomes(IReadOnlyList<HitPointOutcome> first, IReadOnlyList<HitPointOutcome> second)
         {

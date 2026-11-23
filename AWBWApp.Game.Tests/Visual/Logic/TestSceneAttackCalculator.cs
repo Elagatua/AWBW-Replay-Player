@@ -94,6 +94,21 @@ namespace AWBWApp.Game.Tests.Visual.Logic
             AddAssert("The tooltip has something in it", () => popup.DrawWidth > 0);
         }
 
+        /// <summary>
+        /// A direct attacker is measured from the tile it walks to, not the one it set off from,
+        /// which is a different tile going into both the situation and the header's terrain.
+        /// </summary>
+        [Test]
+        public void TestAttackingFromATileTheUnitIsNotStandingOn()
+        {
+            setUpReplay("Tank", "Infantry", buildingUnderDefender: false);
+
+            //The defender sits at (2, 1), so this is a walk around to the far side of it.
+            showAttack(new Vector2I(3, 1));
+
+            AddAssert("The tooltip has something in it", () => popup.DrawWidth > 0);
+        }
+
         [Test]
         public void TestHidingAndShowingAgain()
         {
@@ -133,14 +148,14 @@ namespace AWBWApp.Game.Tests.Visual.Logic
             AddUntilStep("Wait for both units", () => HasUnit(0) && HasUnit(1));
         }
 
-        private void showAttack()
+        private void showAttack(Vector2I? attackFrom = null)
         {
             AddStep("Point the calculator at them", () =>
             {
                 ReplayController.Map.TryGetDrawableUnit(0, out var attacker);
                 ReplayController.Map.TryGetDrawableUnit(1, out var defender);
 
-                popup.ShowAttack(ReplayController, attacker, defender, ToScreenSpace(new Vector2(50, 50)));
+                popup.ShowAttack(ReplayController, attacker, defender, attackFrom ?? attacker.MapPosition, ToScreenSpace(new Vector2(50, 50)));
             });
 
             AddUntilStep("It fades in", () => popup.Alpha > 0);

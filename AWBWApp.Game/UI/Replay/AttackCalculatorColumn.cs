@@ -13,6 +13,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osuTK;
@@ -144,7 +145,11 @@ namespace AWBWApp.Game.UI.Replay
             };
         }
 
-        public void BindTo(ReplayController controller, DrawableUnit unit, PlayerInfo player)
+        /// <param name="position">
+        /// The tile to draw under the unit, which for an attacker is the one it fires from rather
+        /// than the one it is standing on.
+        /// </param>
+        public void BindTo(ReplayController controller, DrawableUnit unit, PlayerInfo player, Vector2I position)
         {
             var coName = player?.ActiveCO.Value.CO?.Name;
             coSprite.Texture = coName != null ? textureStore.Get($"CO/{coName}-Small") : null;
@@ -164,7 +169,7 @@ namespace AWBWApp.Game.UI.Replay
             else
                 healthText.Text = unit.HealthPoints.Value >= 10 ? "" : unit.HealthPoints.Value.ToString(CultureInfo.InvariantCulture);
 
-            var terrain = getTerrainTexture(controller, unit);
+            var terrain = getTerrainTexture(controller, position);
             terrainSprite.Texture = terrain;
 
             if (terrain != null)
@@ -177,19 +182,70 @@ namespace AWBWApp.Game.UI.Replay
             }
         }
 
-        private osu.Framework.Graphics.Textures.Texture getTerrainTexture(ReplayController controller, DrawableUnit unit)
+        private osu.Framework.Graphics.Textures.Texture getTerrainTexture(ReplayController controller, Vector2I position)
         {
-            if (controller.Map.TryGetDrawableBuilding(unit.MapPosition, out var building))
+            if (controller.Map.TryGetDrawableBuilding(position, out var building))
                 return textureStore.Get($"Map/{buildingSkin.Value}/{building.BuildingTile.Textures[WeatherType.Clear]}-0");
 
-            var tile = controller.Map.GetDrawableTile(unit.MapPosition).TerrainTile;
+            var tile = controller.Map.GetDrawableTile(position).TerrainTile;
             return textureStore.Get($"Map/{mapSkin.Value}/{tile.Textures[WeatherType.Clear]}");
         }
     }
 
     /// <summary>
-    /// The second row: everything about this side's position that changes the numbers below, and
-    /// nothing that does not.
+    /// What is known about this unit's hit points: the span the belief leaves open, and the figure
+    /// the replay privately holds where there is one.
+    /// </summary>
+    /// <remarks>
+    /// This is the one row that says how much of the rest of the tooltip is guesswork, so it sits
+    /// directly under the unit it is talking about rather than over the section it feeds.
+    /// </remarks>
+    public partial class HitPointRangeLine : Container
+    {
+        private const float height = 16;
+
+        private readonly SpriteText label;
+
+        public HitPointRangeLine()
+        {
+            Width = AttackCalculatorColumn.WIDTH;
+            Height = height;
+
+            Child = label = new SpriteText
+            {
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                Font = AttackCalculatorColumn.OUTCOME_FONT,
+                Colour = AttackCalculatorColumn.DIM
+            };
+        }
+
+        /// <param name="belief">What can be worked out about this unit's hit points.</param>
+        /// <param name="trueHitPoints">
+        /// The figure the replay really holds, where it has one and is not hiding it.
+        /// </param>
+        public void BindTo(HitPointBelief belief, int? trueHitPoints)
+        {
+            //A belief narrowed to a single value has nothing left for the replay's own figure to
+            //add, because they are necessarily the same number.
+            if (belief.Minimum == belief.Maximum)
+            {
+                label.Text = $"HP: {belief.Minimum}%";
+                return;
+            }
+
+            var text = $"HP range: {belief.Minimum}% - {belief.Maximum}%";
+
+            if (trueHitPoints.HasValue)
+                text += $", True HP: {trueHitPoints.Value}%";
+
+            label.Text = text;
+        }
+    }
+
+    /// <summary>
+    /// Everything about this side's position that changes the numbers below, and nothing that
+    /// does not.
     /// </summary>
     public partial class ContextStrip : Container
     {
