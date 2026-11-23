@@ -63,6 +63,7 @@ namespace AWBWApp.Game
             SetDefault(AWBWSetting.ShowTileCursor, true);
             SetDefault(AWBWSetting.ShowAnimationsForHiddenActions, true);
             SetDefault(AWBWSetting.SonjaHPVisiblity, SonjaHPVisibility.AlwaysVisible);
+            SetDefault(AWBWSetting.ShowExactHitPoints, true);
             SetDefault(AWBWSetting.ShowClock, true);
             SetDefault(AWBWSetting.LockMapPosition, false);
 
@@ -100,7 +101,8 @@ namespace AWBWApp.Game
         MapGridGridColour,
         SonjaHPVisiblity,
         ShowClock,
-        LockMapPosition
+        LockMapPosition,
+        ShowExactHitPoints
     }
 
     public enum MapSkin
