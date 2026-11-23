@@ -3,14 +3,17 @@
 Push a tag. [`release.yml`](../.github/workflows/release.yml) does the rest.
 
 ```
-git tag v0.13.2
-git push fork v0.13.2
+git tag v0.14.1
+git push fork v0.14.1
 ```
 
-The workflow runs the test suite, publishes a self-contained Windows build,
-packs it with Squirrel and creates the GitHub release with the results. It can
+The workflow runs the test suite, then builds each platform on its own runner.
+The last job collects what they produced and creates the GitHub release. It can
 also be run by hand from the Actions tab, giving the version as an input, in
 which case it tags the commit it built.
+
+A platform that fails takes the release with it. That is deliberate: a release
+quietly missing a platform is worse than one that did not happen.
 
 ## The version comes from the tag
 
@@ -44,14 +47,17 @@ here would check upstream's releases on first run, find a higher version, and
 quietly replace itself with that build. Everything in this fork would disappear
 behind an update nobody asked for.
 
-## What a release has to contain
+## What a release contains
 
-| File | Why |
-|---|---|
-| `AWBWReplayPlayerInstaller.exe` | What a person downloads. Squirrel calls it `Setup.exe`; the workflow renames it |
-| `AWBWReplayPlayer-<version>-full.nupkg` | The whole application, for a fresh install or a repair |
-| `AWBWReplayPlayer-<version>-delta.nupkg` | What an existing install actually downloads |
-| `RELEASES` | The index. The updater reads this first to find out what exists |
+| File | Platform | Why |
+|---|---|---|
+| `AWBWReplayPlayerInstaller.exe` | Windows | What a person downloads. Squirrel calls it `Setup.exe`; the workflow renames it |
+| `AWBWReplayPlayer-<version>-full.nupkg` | Windows | The whole application, for a fresh install or a repair |
+| `AWBWReplayPlayer-<version>-delta.nupkg` | Windows | What an existing install actually downloads |
+| `RELEASES` | Windows | The index. The updater reads this first to find out what exists |
+| `AWBWReplayPlayer.AppImage` | Linux | The whole application in one executable file |
+| `AWBWReplayPlayer.AppImage.zsync` | Linux | Lets `AppImageUpdate` fetch only the parts that changed |
+| `AWBW.Replay.Player.app.zip` | macOS | The app bundle |
 
 **`RELEASES` and the packages are not optional.** A release holding only the
 installer installs perfectly well and then never updates again, because the
@@ -70,17 +76,52 @@ settings in `%AppData%\AWBWReplayPlayer` whatever the install is called. Two
 installs under different ids would share one settings file and fight over it, so
 a build from here replaces an upstream install rather than sitting beside it.
 
-## What is not built here
+## Linux
 
-Upstream's releases also carry a Linux `AppImage` and a macOS `.app.zip`. Those
-need their own toolchains and are not produced by this workflow. The in-app
-updater only exists on Windows — see `AWBWAppGameDesktop.CreateUpdateManager` —
-so the Windows assets are the ones that have to be right.
+An AppImage is the whole application plus three things at the root of an
+`AppDir`: something to run, a desktop entry describing it, and an icon that
+entry names. The icon is already in the repository at
+`AWBWApp.Resources/Textures/Icon/ICO256.png`, so nothing is converted.
 
-## Checking it by hand
+`AppRun` is a script rather than a symlink into `usr/bin` because the executable
+is called `AWBW Replay Player`, spaces and all.
 
-The workflow's two real steps can be run locally, which is how they were
-arrived at:
+Two details about the runner rather than the format: `appimagetool` is pinned to
+AppImageKit 13 rather than its `continuous` tag, so that a release built today
+and one built next year are built by the same tool; and it runs with
+`--appimage-extract-and-run`, because GitHub runners have no FUSE for it to
+mount itself with.
+
+## macOS
+
+A plain bundle: the publish output in `Contents/MacOS`, the `.icns` already in
+the repository in `Contents/Resources`, and an `Info.plist` naming the
+executable. It is zipped with `ditto` rather than `zip`, which would flatten the
+symlinks inside the bundle.
+
+**It is not signed.** Nobody here has an Apple Developer account, so Gatekeeper
+will refuse to open it until the person who downloaded it right-clicks and
+chooses Open, or clears the quarantine attribute by hand. Upstream's bundle is
+in the same position.
+
+It is built for Intel, which Apple silicon runs under Rosetta. A universal
+bundle would mean publishing twice and splicing the two binaries together.
+
+## Only Windows updates itself
+
+`AWBWAppGameDesktop.CreateUpdateManager` returns the Squirrel updater on Windows
+and a do-nothing one everywhere else. So the Windows assets are the ones that
+have to be right: a mistake there installs itself on everyone who already has
+the app, while a mistake in the other two is only ever seen by someone
+downloading afresh.
+
+The `.zsync` file is there for `AppImageUpdate` and similar external tools. The
+app itself does not use it.
+
+## Checking the Windows half by hand
+
+The two steps that produce the Windows assets can be run locally, which is how
+they were arrived at:
 
 ```powershell
 dotnet publish AWBWApp.Desktop/AWBWApp.Desktop.csproj -c Release -r win-x64 --self-contained true -p:Version=0.13.2 -o publish

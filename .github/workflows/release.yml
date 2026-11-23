@@ -6,6 +6,10 @@ name: Release
 # The version matters more than it looks: the app treats itself as a deployed build, and so
 # starts checking for updates, only once its assembly version is above 0.0. A build left at the
 # repository's own 0.0.0 will never update itself.
+#
+# Each platform builds on its own runner and hands its files to the release job, which is the
+# only one that touches GitHub. A platform that fails takes the release with it, which is the
+# point: a release quietly missing a platform is worse than one that did not happen.
 
 on:
   push:
@@ -20,6 +24,21 @@ permissions:
   contents: write
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+    - name: Work out the version
+      id: version
+      run: |
+        version="${{ github.event.inputs.version }}"
+        [ -n "$version" ] || version="${GITHUB_REF_NAME#v}"
+        echo "Building $version"
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+
   test:
     runs-on: ubuntu-latest
 
@@ -37,7 +56,7 @@ jobs:
       run: dotnet test --no-build --verbosity normal --filter "TestCategory!=NoCI"
 
   windows:
-    needs: test
+    needs: [ version, test ]
     runs-on: windows-latest
 
     defaults:
@@ -51,20 +70,12 @@ jobs:
       with:
         dotnet-version: 6.0.x
 
-    - name: Work out the version
-      id: version
-      run: |
-        version="${{ github.event.inputs.version }}"
-        [ -n "$version" ] || version="${GITHUB_REF_NAME#v}"
-        echo "Building $version"
-        echo "version=$version" >> "$GITHUB_OUTPUT"
-
     - name: Publish
       run: |
         dotnet publish AWBWApp.Desktop/AWBWApp.Desktop.csproj \
           -c Release -r win-x64 --self-contained true \
-          -p:Version=${{ steps.version.outputs.version }} \
-          -p:FileVersion=${{ steps.version.outputs.version }} \
+          -p:Version=${{ needs.version.outputs.version }} \
+          -p:FileVersion=${{ needs.version.outputs.version }} \
           -o publish
 
     # Squirrel ships inside the Clowd.Squirrel package the desktop project already depends on, so
@@ -79,7 +90,7 @@ jobs:
 
     # Squirrel writes a delta against whatever it finds in the release directory, so pulling the
     # last release down first is what keeps an update a few hundred KB rather than sixty MB. There
-    # is nothing to fetch for the first release, which is why this is allowed to fail.
+    # is nothing to fetch for the first release, where this finds no releases and does nothing.
     - name: Fetch the previous release
       continue-on-error: true
       run: |
@@ -92,7 +103,7 @@ jobs:
       run: |
         "${{ steps.squirrel.outputs.path }}" pack \
           -u AWBWReplayPlayer \
-          -v ${{ steps.version.outputs.version }} \
+          -v ${{ needs.version.outputs.version }} \
           -p publish \
           -r Releases \
           --packTitle "AWBW Replay Player" \
@@ -104,6 +115,159 @@ jobs:
     - name: Name the installer the way the releases do
       run: mv Releases/AWBWReplayPlayerSetup.exe Releases/AWBWReplayPlayerInstaller.exe
 
+    - uses: actions/upload-artifact@v4
+      with:
+        name: windows
+        path: Releases/*
+
+  linux:
+    needs: [ version, test ]
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 6.0.x
+
+    # zsync writes the .zsync file beside the AppImage, which is how an existing install works out
+    # which few KB of a new one it actually needs.
+    - name: Install the packaging tools
+      run: sudo apt-get update && sudo apt-get install -y zsync desktop-file-utils
+
+    - name: Publish
+      run: |
+        dotnet publish AWBWApp.Desktop/AWBWApp.Desktop.csproj \
+          -c Release -r linux-x64 --self-contained true \
+          -p:Version=${{ needs.version.outputs.version }} \
+          -p:FileVersion=${{ needs.version.outputs.version }} \
+          -o publish
+
+    # An AppDir is the whole application plus three things at its root: something to run, a
+    # desktop entry describing it, and an icon the entry names. The repository already carries a
+    # 256px icon, so nothing has to be converted here.
+    - name: Build the AppDir
+      run: |
+        mkdir -p AppDir/usr/bin
+        cp -r publish/. AppDir/usr/bin/
+        cp AWBWApp.Resources/Textures/Icon/ICO256.png AppDir/AWBWReplayPlayer.png
+
+        cat > AppDir/AWBWReplayPlayer.desktop <<'EOF'
+        [Desktop Entry]
+        Type=Application
+        Name=AWBW Replay Player
+        Comment=An Advance Wars By Web replay player
+        Exec=AWBWReplayPlayer
+        Icon=AWBWReplayPlayer
+        Categories=Game;
+        Terminal=false
+        EOF
+
+        # The executable's name has spaces in it, which is why this is a script rather than a
+        # symlink into usr/bin.
+        cat > AppDir/AppRun <<'EOF'
+        #!/bin/sh
+        HERE="$(dirname "$(readlink -f "$0")")"
+        exec "$HERE/usr/bin/AWBW Replay Player" "$@"
+        EOF
+
+        chmod +x AppDir/AppRun "AppDir/usr/bin/AWBW Replay Player"
+        desktop-file-validate AppDir/AWBWReplayPlayer.desktop
+
+    # Pinned rather than taken from the 'continuous' tag, so that a release built today and one
+    # built next year are built by the same tool.
+    - name: Build the AppImage
+      env:
+        ARCH: x86_64
+      run: |
+        curl -sSLo appimagetool https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage
+        chmod +x appimagetool
+
+        # Runners have no FUSE, so the tool has to unpack itself before it can run.
+        ./appimagetool --appimage-extract-and-run \
+          -u "gh-releases-zsync|${{ github.repository_owner }}|${{ github.event.repository.name }}|latest|AWBWReplayPlayer.AppImage.zsync" \
+          AppDir AWBWReplayPlayer.AppImage
+
+        ls -la AWBWReplayPlayer.AppImage AWBWReplayPlayer.AppImage.zsync
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: linux
+        path: |
+          AWBWReplayPlayer.AppImage
+          AWBWReplayPlayer.AppImage.zsync
+
+  macos:
+    needs: [ version, test ]
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 6.0.x
+
+    # Built for Intel rather than Apple silicon, which runs under Rosetta on both. A universal
+    # bundle would mean publishing twice and splicing the two binaries together.
+    - name: Publish
+      run: |
+        dotnet publish AWBWApp.Desktop/AWBWApp.Desktop.csproj \
+          -c Release -r osx-x64 --self-contained true \
+          -p:Version=${{ needs.version.outputs.version }} \
+          -p:FileVersion=${{ needs.version.outputs.version }} \
+          -o publish
+
+    - name: Build the app bundle
+      run: |
+        APP="AWBW Replay Player.app"
+        mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+        cp -R publish/. "$APP/Contents/MacOS/"
+        cp AWBWApp.Resources/Textures/Icon/ICO256.icns "$APP/Contents/Resources/game.icns"
+
+        cat > "$APP/Contents/Info.plist" <<EOF
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+          <key>CFBundleName</key><string>AWBW Replay Player</string>
+          <key>CFBundleDisplayName</key><string>AWBW Replay Player</string>
+          <key>CFBundleIdentifier</key><string>com.github.elagatua.awbwreplayplayer</string>
+          <key>CFBundleExecutable</key><string>AWBW Replay Player</string>
+          <key>CFBundleIconFile</key><string>game</string>
+          <key>CFBundlePackageType</key><string>APPL</string>
+          <key>CFBundleVersion</key><string>${{ needs.version.outputs.version }}</string>
+          <key>CFBundleShortVersionString</key><string>${{ needs.version.outputs.version }}</string>
+          <key>LSMinimumSystemVersion</key><string>10.15</string>
+          <key>NSHighResolutionCapable</key><true/>
+        </dict>
+        </plist>
+        EOF
+
+        chmod +x "$APP/Contents/MacOS/AWBW Replay Player"
+        plutil -lint "$APP/Contents/Info.plist"
+
+        # ditto rather than zip, which would flatten the symlinks inside the bundle.
+        ditto -c -k --sequesterRsrc --keepParent "$APP" AWBW.Replay.Player.app.zip
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: macos
+        path: AWBW.Replay.Player.app.zip
+
+  release:
+    needs: [ version, windows, linux, macos ]
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        path: assets
+        merge-multiple: true
+
+    - run: ls -la assets
+
     # RELEASES and the nupkgs are not decoration: the in-app updater reads RELEASES to find out
     # what is available and downloads the packages beside it. A release missing them installs fine
     # and then never updates again.
@@ -111,8 +275,9 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        gh release create "v${{ steps.version.outputs.version }}" \
-          --title "v${{ steps.version.outputs.version }}" \
+        gh release create "v${{ needs.version.outputs.version }}" \
+          --repo "${{ github.repository }}" \
+          --title "v${{ needs.version.outputs.version }}" \
           --generate-notes \
           --target "${{ github.sha }}" \
-          Releases/*
+          assets/*
