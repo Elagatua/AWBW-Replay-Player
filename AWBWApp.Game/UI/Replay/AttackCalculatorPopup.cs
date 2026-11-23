@@ -147,7 +147,7 @@ namespace AWBWApp.Game.UI.Replay
             var signature = string.Join('/', attacker.UnitID, defender.UnitID,
                 attacker.HealthPoints.Value, defender.HealthPoints.Value,
                 attacker.Ammo.Value, defender.Ammo.Value,
-                attacker.MapPosition, defender.MapPosition, attackFrom,
+                describe(attacker.MapPosition), describe(defender.MapPosition), describe(attackFrom),
                 controller.CurrentTurnIndex.Value,
                 describe(controller.GetHitPointBelief(attacker.UnitID)),
                 describe(controller.GetHitPointBelief(defender.UnitID)),
@@ -273,6 +273,13 @@ namespace AWBWApp.Game.UI.Replay
         }
 
         private static string describe(HitPointBelief belief) => belief == null ? "?" : $"{belief.Minimum}-{belief.Maximum}";
+
+        /// <summary>
+        /// A tile, spelled out. <see cref="Vector2I"/> does not override ToString, so dropping one
+        /// into the signature as it stands contributes the name of its type and nothing else -
+        /// every tile on the board reads the same, and the tooltip never notices that it moved.
+        /// </summary>
+        private static string describe(Vector2I position) => $"{position.X},{position.Y}";
 
         private static string describeExact(ReplayController controller, DrawableUnit unit) =>
             tryGetExactHitPoints(controller, unit, out var hitPoints) ? hitPoints.ToString(CultureInfo.InvariantCulture) : "?";

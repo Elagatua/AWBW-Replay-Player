@@ -1,8 +1,11 @@
+using System.Collections.Generic;
+using System.Linq;
 using AWBWApp.Game.Helpers;
 using AWBWApp.Game.UI.Replay;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics.Primitives;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Testing;
 using osuTK;
 
@@ -121,7 +124,40 @@ namespace AWBWApp.Game.Tests.Visual.Logic
             showAttack();
         }
 
-        private void setUpReplay(string attackerUnit, string defenderUnit, bool buildingUnderDefender)
+        /// <summary>
+        /// Moving the attacker around its target changes the ground it would fire from, and with it
+        /// every number below. The tooltip only rebuilds itself when something it depends on has
+        /// changed, so it has to notice that this did.
+        /// </summary>
+        [Test]
+        public void TestWalkingRoundToTheOtherSideOfTheTarget()
+        {
+            setUpReplay("Tank", "Infantry", buildingUnderDefender: false, mountainBelowDefender: true);
+
+            //Firing from beside the defender, standing on a plain.
+            showAttack(new Vector2I(1, 1));
+
+            var fromThePlain = new List<string>();
+            AddStep("Read what it says", () => fromThePlain.AddRange(readTooltip()));
+
+            //And from the mountain on its other side, which is four defence stars rather than one.
+            showAttack(new Vector2I(2, 2));
+
+            AddAssert("It says something different from the mountain", () =>
+            {
+                var fromTheMountain = readTooltip();
+
+                Assert.That(fromTheMountain, Is.Not.EqualTo(fromThePlain),
+                    "the tooltip did not notice the attacker had moved to different ground");
+
+                return true;
+            });
+        }
+
+        private List<string> readTooltip() =>
+            popup.ChildrenOfType<SpriteText>().Select(x => x.Text.ToString()).ToList();
+
+        private void setUpReplay(string attackerUnit, string defenderUnit, bool buildingUnderDefender, bool mountainBelowDefender = false)
         {
             AddStep($"Load {attackerUnit} against {defenderUnit}", () =>
             {
@@ -142,7 +178,13 @@ namespace AWBWApp.Game.Tests.Visual.Logic
                     turn.Buildings.Add(building.Position, building);
                 }
 
-                ReplayController.LoadReplay(data, CreateBasicMap(5, 5));
+                var map = CreateBasicMap(5, 5);
+
+                //Four defence stars against the plain everything else sits on.
+                if (mountainBelowDefender)
+                    map.Ids[2 * 5 + 2] = 2;
+
+                ReplayController.LoadReplay(data, map);
             });
 
             AddUntilStep("Wait for both units", () => HasUnit(0) && HasUnit(1));
