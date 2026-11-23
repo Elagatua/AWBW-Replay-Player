@@ -87,17 +87,36 @@ entry names. The icon is already in the repository at
 is called `AWBW Replay Player`, spaces and all.
 
 Two details about the runner rather than the format: `appimagetool` is pinned to
-AppImageKit 13 rather than its `continuous` tag, so that a release built today
+a tagged release rather than its `continuous` tag, so that a release built today
 and one built next year are built by the same tool; and it runs with
 `--appimage-extract-and-run`, because GitHub runners have no FUSE for it to
 mount itself with.
+
+The tool now lives in `AppImage/appimagetool`. The AppImageKit release it used
+to ship in still exists with every asset renamed to `obsolete-` something, so
+the old URL answers with a 404 *page* rather than an error, and a download
+without `--fail` saves that page and calls it a tool.
 
 ## macOS
 
 A plain bundle: the publish output in `Contents/MacOS`, the `.icns` already in
 the repository in `Contents/Resources`, and an `Info.plist` naming the
-executable. It is zipped with `ditto` rather than `zip`, which would flatten the
-symlinks inside the bundle.
+executable.
+
+**It is built on a Linux runner.** Nothing about it needs a Mac - the publish is
+a cross-compile, a bundle is a directory with a plist in it, and the one step
+that would genuinely require macOS is signing, which is not happening anyway.
+What a macOS runner does bring is a queue: GitHub's arm64 pool is capacity
+constrained, and the first release that asked for one never got it. The job sat
+queued for fifteen minutes and was cancelled with *"The job was not acquired by
+Runner of type hosted"*.
+
+Two macOS tools had to be replaced, and both matter more than they look.
+`plutil -lint` becomes a line of Python, so a malformed plist is still caught
+here rather than on someone's Mac. `ditto -c -k` becomes `zip -y`, where the
+`-y` is the whole point: without it the symlinks inside the bundle are followed
+and copied, leaving an archive that is both larger and no longer something macOS
+will open.
 
 **It is not signed.** Nobody here has an Apple Developer account, so Gatekeeper
 will refuse to open it until the person who downloaded it right-clicks and

@@ -177,11 +177,16 @@ jobs:
 
     # Pinned rather than taken from the 'continuous' tag, so that a release built today and one
     # built next year are built by the same tool.
+    #
+    # The tool lives in its own repository now. The AppImageKit release it used to ship in is
+    # still there, with every asset renamed to 'obsolete-' something, so the old URL answers with
+    # a 404 page rather than an error - which is what --fail is for. Without it curl saves the
+    # page as the tool and the failure surfaces two lines later as 'Not: command not found'.
     - name: Build the AppImage
       env:
         ARCH: x86_64
       run: |
-        curl -sSLo appimagetool https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage
+        curl --fail -sSLo appimagetool https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
         chmod +x appimagetool
 
         # Runners have no FUSE, so the tool has to unpack itself before it can run.
@@ -198,9 +203,17 @@ jobs:
           AWBWReplayPlayer.AppImage
           AWBWReplayPlayer.AppImage.zsync
 
+  # Built on Linux, on purpose. Nothing here needs a Mac: the publish is a cross-compile, a
+  # bundle is a directory with a plist in it, and the one thing that would genuinely require
+  # macOS - signing - is not happening, because nobody here has an Apple Developer account.
+  #
+  # What a macOS runner does bring is a queue. GitHub's arm64 pool is capacity constrained, and
+  # the first release that asked for one never got it: the job sat queued for fifteen minutes and
+  # was cancelled with "The job was not acquired by Runner of type hosted". A release should not
+  # be a lottery.
   macos:
     needs: [ version, test ]
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
@@ -245,11 +258,19 @@ jobs:
         </plist>
         EOF
 
+        # macOS will not launch a bundle whose executable is not marked as one, and nothing on
+        # this side of the build sets that bit for it.
         chmod +x "$APP/Contents/MacOS/AWBW Replay Player"
-        plutil -lint "$APP/Contents/Info.plist"
 
-        # ditto rather than zip, which would flatten the symlinks inside the bundle.
-        ditto -c -k --sequesterRsrc --keepParent "$APP" AWBW.Replay.Player.app.zip
+        # Stands in for plutil -lint, which is only on macOS. A malformed plist would otherwise
+        # travel all the way to someone's Mac before anything noticed.
+        python3 -c "import plistlib, sys; plistlib.load(open(sys.argv[1], 'rb'))" "$APP/Contents/Info.plist"
+
+        # -y keeps the symlinks inside the bundle as symlinks. Without it they are followed and
+        # copied, which both bloats the archive and leaves a bundle macOS will not open. This is
+        # what ditto -c -k would do on a Mac.
+        zip -r -y -q AWBW.Replay.Player.app.zip "$APP"
+        unzip -l AWBW.Replay.Player.app.zip | tail -3
 
     - uses: actions/upload-artifact@v4
       with:
