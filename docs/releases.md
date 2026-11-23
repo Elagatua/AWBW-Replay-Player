@@ -68,6 +68,16 @@ the workflow pulls the previous release down (`Squirrel.exe github-down`) before
 packing. That step is allowed to fail, because the first release has nothing to
 pull.
 
+Once it has served that purpose, the previous release's **full** package is
+deleted rather than uploaded again: an install too old to follow the deltas
+downloads the newest full package, never an older one. The deltas stay, because
+they are the update path, and `RELEASES` is pruned to name only what is actually
+there. A release carries one full package, a handful of deltas and the index.
+
+This happens after packing, not before. Delete the old package first and there
+is nothing to write a delta against, which turns every update back into a sixty
+megabyte download.
+
 ## The package id
 
 The pack id is `AWBWReplayPlayer`, the same as upstream's. This is deliberate:
