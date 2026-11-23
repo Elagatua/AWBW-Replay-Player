@@ -37,7 +37,34 @@ namespace AWBWApp.Game.UI.Replay
 
         public static readonly Color4 DIM = new Color4(150, 150, 150, 255);
         public static readonly Color4 DESTROYED = new Color4(230, 85, 70, 255);
-        public static readonly Color4 SURVIVES = new Color4(95, 180, 230, 255);
+
+        private static readonly Color4 never = new Color4(230, 85, 70, 255);
+        private static readonly Color4 even_odds = new Color4(235, 200, 70, 255);
+        private static readonly Color4 certain = new Color4(110, 210, 110, 255);
+
+        /// <summary>
+        /// How likely something is, as a colour: red at nothing, yellow at even odds, green at
+        /// certain, and a straight line through each half.
+        /// </summary>
+        /// <remarks>
+        /// This says nothing about whether the outcome is a good one. A column full of red is a
+        /// spread with no favourite in it, not a column full of bad news - the left of each row
+        /// still says which outcome it is.
+        /// </remarks>
+        public static Color4 ForLikelihood(double probability)
+        {
+            var amount = (float)Math.Clamp(probability, 0, 1);
+
+            return amount < 0.5f
+                ? mix(never, even_odds, amount * 2)
+                : mix(even_odds, certain, (amount - 0.5f) * 2);
+        }
+
+        private static Color4 mix(Color4 from, Color4 to, float amount) =>
+            new Color4(from.R + (to.R - from.R) * amount,
+                from.G + (to.G - from.G) * amount,
+                from.B + (to.B - from.B) * amount,
+                1);
     }
 
     /// <summary>
@@ -435,7 +462,10 @@ namespace AWBWApp.Game.UI.Replay
             Height = 16;
 
             var destroyed = outcome.HitPoints <= 0;
-            var colour = destroyed ? AttackCalculatorColumn.DESTROYED : AttackCalculatorColumn.SURVIVES;
+
+            //The bar and its figure are coloured by how likely this outcome is, not by what it is.
+            //Which outcome it is, the left of the row already says.
+            var colour = AttackCalculatorColumn.ForLikelihood(outcome.Probability);
 
             Children = new Drawable[]
             {
