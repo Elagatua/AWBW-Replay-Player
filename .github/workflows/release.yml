@@ -115,6 +115,31 @@ jobs:
     - name: Name the installer the way the releases do
       run: mv Releases/AWBWReplayPlayerSetup.exe Releases/AWBWReplayPlayerInstaller.exe
 
+    # The previous release's full package was fetched so that a delta could be written against
+    # it. Having served that purpose it is sixty megabytes of nothing: an install too old to
+    # follow the deltas downloads the newest full package, never an older one. The deltas
+    # themselves stay, because they are the update path.
+    #
+    # RELEASES is pruned to match. An index naming a package that is not there would be worse
+    # than one entry short.
+    - name: Leave behind what the next update will not need
+      run: |
+        find Releases -name '*-full.nupkg' ! -name '*-${{ needs.version.outputs.version }}-full.nupkg' -print -delete
+
+        # An if rather than a test-and-print: this runs under bash -e, where a failing test at
+        # the end of a loop body takes the whole job with it - on the very line whose purpose is
+        # to find something missing.
+        while IFS= read -r entry; do
+          file=$(printf '%s' "$entry" | awk '{print $2}')
+
+          if [ -f "Releases/$file" ]; then
+            printf '%s\n' "$entry"
+          fi
+        done < Releases/RELEASES > RELEASES.pruned
+
+        mv RELEASES.pruned Releases/RELEASES
+        cat Releases/RELEASES
+
     - uses: actions/upload-artifact@v4
       with:
         name: windows
