@@ -19,7 +19,12 @@ namespace AWBWApp.Game.Game.Tile
             }
 
             foreach (var tile in tilesByCode)
+            {
+                //The key doubles as the tile's name. Tiles.json does not spell one out, and
+                //nothing else in the data tells a bridge apart from a road.
+                tile.Value.Name ??= tile.Key;
                 tilesByAWBWId.Add(tile.Value.AWBWID, tile.Value);
+            }
 
             //Map ID 0 to the teleport tile as well.
             tilesByAWBWId[0] = tilesByCode["Teleport Tile"];

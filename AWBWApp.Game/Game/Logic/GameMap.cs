@@ -7,6 +7,7 @@ using AWBWApp.Game.API.Replay.Actions;
 using AWBWApp.Game.Game.Building;
 using AWBWApp.Game.Game.COs;
 using AWBWApp.Game.Game.Country;
+using AWBWApp.Game.Game.Damage;
 using AWBWApp.Game.Game.Tile;
 using AWBWApp.Game.Game.Units;
 using AWBWApp.Game.Helpers;
@@ -436,7 +437,7 @@ namespace AWBWApp.Game.Game.Logic
             attackCalculatorIndicator.ShowAttack(source.MapPosition, tilePosition, target != null);
 
             if (target != null)
-                AttackPopup.ShowAttack(source, target, mousePosition);
+                AttackPopup.ShowAttack(ReplayController, source, target, mousePosition);
             else
                 AttackPopup.HideAttack();
         }
@@ -734,6 +735,48 @@ namespace AWBWApp.Game.Game.Logic
         }
 
         public DrawableTile GetDrawableTile(Vector2I position) => TileGrid[position.X, position.Y];
+
+
+        /// <summary>
+        /// The defence stars a unit standing here would get. A building covers the tile beneath it.
+        /// </summary>
+        public int GetTerrainDefenceAt(Vector2I position)
+        {
+            if (BuildingGrid.TryGet(position, out var building))
+                return building.BuildingTile.BaseDefence;
+
+            return TileGrid[position.X, position.Y].TerrainTile.BaseDefence;
+        }
+
+        /// <summary>
+        /// What the damage charts call the terrain here, for the four COs that get a bonus from it.
+        /// </summary>
+        public string GetDamageTerrainAt(Vector2I position)
+        {
+            BuildingGrid.TryGet(position, out var building);
+            return DamageTerrain.For(TileGrid[position.X, position.Y].TerrainTile, building?.BuildingTile);
+        }
+
+        /// <summary>
+        /// How many buildings of one type a player holds, by <see cref="BuildingTile.BuildingType"/>
+        /// - "ComTower" and "City" being the two the damage calculator asks about.
+        /// </summary>
+        /// <remarks>
+        /// Counted by sweeping the board rather than kept as a running total, since nothing else
+        /// needs the number and the only caller asks while a tooltip is open.
+        /// </remarks>
+        public int CountBuildingsForPlayer(string buildingType, long playerID)
+        {
+            var count = 0;
+
+            foreach (var building in BuildingGrid)
+            {
+                if (building.OwnerID == playerID && building.BuildingTile.BuildingType == buildingType)
+                    count++;
+            }
+
+            return count;
+        }
 
         public void UpdateBuilding(ReplayBuilding awbwBuilding, bool setBuildingToReady)
         {

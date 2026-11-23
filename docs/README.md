@@ -14,6 +14,7 @@ interesting part.
 | [action-pipeline.md](action-pipeline.md) | `IReplayAction`'s four-phase contract; how to add or change an action |
 | [game-rules.md](game-rules.md) | The Advance Wars rules this program models (HP, funds, fog, powers, repair) and the ones it doesn't |
 | [data-files.md](data-files.md) | `Units.json`, `Tiles.json`, `Buildings.json`, `COs.json`, `Countries.json`, terrain caching |
+| [damage.md](damage.md) | The damage formula and its charts — the one rule this program computes rather than reads |
 | [gotchas.md](gotchas.md) | Non-obvious traps, ranked by how much time they cost |
 
 ## The three things most likely to bite you

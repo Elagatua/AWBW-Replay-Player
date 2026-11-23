@@ -6,7 +6,9 @@ using AWBWApp.Game.API.Replay.Actions;
 using AWBWApp.Game.Game.Building;
 using AWBWApp.Game.Game.COs;
 using AWBWApp.Game.Game.Country;
+using AWBWApp.Game.Game.Damage;
 using AWBWApp.Game.Game.Tile;
+using AWBWApp.Game.Game.Units;
 using AWBWApp.Game.Helpers;
 using AWBWApp.Game.Input;
 using AWBWApp.Game.UI;
@@ -1107,6 +1109,47 @@ namespace AWBWApp.Game.Game.Logic
                 TurnEnd = endTurn,
                 Power = power
             });
+        }
+
+        /// <summary>
+        /// Gathers everything <see cref="DamageCalculator"/> needs about two units as they stand
+        /// right now. Returns null where either unit has no owner, which cargo does not.
+        /// </summary>
+        /// <param name="isCounterAttack">
+        /// True when this is the defender hitting back. Only Sonja makes that differ.
+        /// </param>
+        public AttackSituation CreateAttackSituation(DrawableUnit attacker, DrawableUnit defender, bool isCounterAttack = false)
+        {
+            if (attacker?.OwnerID == null || defender?.OwnerID == null)
+                return null;
+
+            if (!Players.TryGetValue(attacker.OwnerID.Value, out var attackingPlayer) ||
+                !Players.TryGetValue(defender.OwnerID.Value, out var defendingPlayer))
+                return null;
+
+            return new AttackSituation
+            {
+                Attacker = createCombatantState(attacker, attackingPlayer),
+                Defender = createCombatantState(defender, defendingPlayer),
+                IsCounterAttack = isCounterAttack
+            };
+        }
+
+        private CombatantState createCombatantState(DrawableUnit unit, PlayerInfo player)
+        {
+            return new CombatantState
+            {
+                Unit = unit.UnitData,
+                HitPoints = unit.HealthPoints.Value,
+                Ammo = unit.Ammo.Value,
+                CO = player.ActiveCO.Value.CO?.Name,
+                Power = player.ActivePower.Value,
+                ComTowers = Map.CountBuildingsForPlayer("ComTower", player.ID),
+                Cities = Map.CountBuildingsForPlayer("City", player.ID),
+                Funds = player.Funds.Value,
+                Terrain = Map.GetDamageTerrainAt(unit.MapPosition),
+                TerrainStars = Map.GetTerrainDefenceAt(unit.MapPosition)
+            };
         }
 
         public PowerAction GetActivePowerForPlayer(long playerID)

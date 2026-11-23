@@ -16,13 +16,17 @@ An Advance Wars By Web replay player, built on osu!framework (C#, .NET).
   program models, and which it deliberately does not
 - [docs/data-files.md](docs/data-files.md) — `Units.json`, `Tiles.json`,
   `Buildings.json`, `COs.json`, `Countries.json`
+- [docs/damage.md](docs/damage.md) — the damage formula and its charts; read
+  before touching anything under `Game/Damage/`
 - [docs/gotchas.md](docs/gotchas.md) — the traps, in order of cost
 
 ## Rules of thumb
 
 - **The player is not a game engine.** It never resolves combat, rolls luck, or
   validates a move; it applies outcomes the replay already states. Before
-  computing a game rule, check whether the replay supplies the answer.
+  computing a game rule, check whether the replay supplies the answer. The sole
+  exception is `Game/Damage/`, which answers what *would* happen rather than what
+  did — see [docs/damage.md](docs/damage.md).
 - **Every action runs twice**: `SetupAndUpdate` (plain data, whole replay, up
   front) and `PerformAction` (drawables, one action at a time). Know which world
   your code is in. See [docs/architecture.md](docs/architecture.md).

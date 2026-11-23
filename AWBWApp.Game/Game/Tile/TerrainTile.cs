@@ -8,6 +8,12 @@ namespace AWBWApp.Game.Game.Tile
     {
         public int AWBWID { get; set; }
 
+        /// <summary>
+        /// The key this tile has in Tiles.json, filled in by <see cref="TerrainTileStorage"/>.
+        /// The damage charts need it to tell a bridge from the road it matches in every other field.
+        /// </summary>
+        public string Name { get; set; }
+
         public int BaseDefence { get; set; }
 
         public int SightDistanceIncrease { get; set; }
