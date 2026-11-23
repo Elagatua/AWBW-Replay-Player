@@ -169,9 +169,14 @@ whose whole subject is uncertainty. Both offer the same three answers:
 
 | | The calculator shows |
 |---|---|
-| Nominal | Nothing but the board: every unit sits exactly on its tenth, and the ending hit points are headed *Ending HP* |
+| Nominal | Nothing but the board: every unit sits exactly on its tenth, and the section is headed *Ending HP* |
 | Possible | The worked-out ranges, and nothing the replay privately knows |
-| True | Those, plus the *Using true HP* section and the real figure beside each range |
+| True | The figures the replay really recorded, and nothing worked out |
+| Both | The last two, one section above the other |
+
+The calculator has a fourth option because it can show two answers at once, one
+above the other, which the tile info popup cannot - so the two settings use
+separate enums rather than one with an option that does nothing on one side.
 
 [`HitPointBeliefTracker`](../AWBWApp.Game/Game/Damage/HitPointBeliefTracker.cs)
 carries this through the setup pass. Three things narrow a belief and one widens

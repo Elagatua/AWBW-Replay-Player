@@ -65,7 +65,7 @@ namespace AWBWApp.Game
             SetDefault(AWBWSetting.ShowAnimationsForHiddenActions, true);
             SetDefault(AWBWSetting.SonjaHPVisiblity, SonjaHPVisibility.AlwaysVisible);
             SetDefault(AWBWSetting.TileInfoHitPoints, HitPointDisplay.True);
-            SetDefault(AWBWSetting.CalculatorHitPoints, HitPointDisplay.True);
+            SetDefault(AWBWSetting.CalculatorHitPoints, CalculatorHitPointDisplay.Both);
             SetDefault(AWBWSetting.ShowClock, true);
             SetDefault(AWBWSetting.LockMapPosition, false);
 

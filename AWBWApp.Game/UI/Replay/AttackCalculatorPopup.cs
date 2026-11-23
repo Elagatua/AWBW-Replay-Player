@@ -39,12 +39,12 @@ namespace AWBWApp.Game.UI.Replay
         [Resolved]
         private DamageCalculator calculator { get; set; }
 
-        private Bindable<HitPointDisplay> hitPointDisplay;
+        private Bindable<CalculatorHitPointDisplay> hitPointDisplay;
 
         [BackgroundDependencyLoader]
         private void load(AWBWConfigManager configManager)
         {
-            hitPointDisplay = configManager.GetBindable<HitPointDisplay>(AWBWSetting.CalculatorHitPoints);
+            hitPointDisplay = configManager.GetBindable<CalculatorHitPointDisplay>(AWBWSetting.CalculatorHitPoints);
         }
 
         private readonly CombatantHeader attackerHeader;
@@ -225,18 +225,24 @@ namespace AWBWApp.Game.UI.Replay
             //How much this tooltip is allowed to say, which is a setting of its own: wanting the
             //plain figure while hovering a unit says nothing about what is wanted here, where
             //uncertainty is the subject rather than an inconvenience.
-            var detail = hitPointDisplay?.Value ?? HitPointDisplay.True;
-            var showsTrueHitPoints = detail == HitPointDisplay.True;
+            var detail = hitPointDisplay?.Value ?? CalculatorHitPointDisplay.Both;
+            var showsTrueHitPoints = detail is CalculatorHitPointDisplay.True or CalculatorHitPointDisplay.Both;
 
             //What a person watching could work out, rather than the top of each unit's tenth. A
             //unit showing 8 is somewhere in 71 to 80, and often somewhere much narrower than that.
-            //At the plainest setting none of that is wanted, and each unit is taken to be sitting
-            //exactly on its tenth - which is what this tooltip did before it learnt to track
-            //anything, and is the only honest label for it.
+            //The other two settings ask for something simpler: the board's own figures, or the
+            //replay's.
             var attackerBelief = beliefFor(controller, attacker, detail);
             var defenderBelief = beliefFor(controller, defender, detail);
 
-            shownSectionLabel.Text = detail == HitPointDisplay.Nominal ? "Ending HP" : "Using calculated HP values";
+            //Named after what is in it. A section headed as calculated, holding figures nothing
+            //calculated, would be the label lying about its contents.
+            shownSectionLabel.Text = detail switch
+            {
+                CalculatorHitPointDisplay.Nominal => "Ending HP",
+                CalculatorHitPointDisplay.True => "Using true HP",
+                _ => "Using calculated HP values"
+            };
 
             var hasExactAttacker = tryGetExactHitPoints(controller, attacker, out var exactAttackerHitPoints);
             var hasExactDefender = tryGetExactHitPoints(controller, defender, out var exactDefenderHitPoints);
@@ -264,7 +270,9 @@ namespace AWBWApp.Game.UI.Replay
             //and a repeated block of identical bars is just noise.
             var showExact = false;
 
-            if (showsTrueHitPoints && shown.Attack.CanAttack && hasExactAttacker && hasExactDefender)
+            //Only the setting that asks for both draws a second section. The one that asks for
+            //the true figures alone has them in the section above already.
+            if (detail == CalculatorHitPointDisplay.Both && shown.Attack.CanAttack && hasExactAttacker && hasExactDefender)
             {
                 var exact = calculator.ResolveExchange(situation, exactAttackerHitPoints, exactDefenderHitPoints);
 
@@ -294,10 +302,16 @@ namespace AWBWApp.Game.UI.Replay
                 list.ClearOutcomes();
         }
 
-        private static HitPointBelief beliefFor(ReplayController controller, DrawableUnit unit, HitPointDisplay detail)
+        private static HitPointBelief beliefFor(ReplayController controller, DrawableUnit unit, CalculatorHitPointDisplay detail)
         {
-            if (detail == HitPointDisplay.Nominal)
+            //Nothing but the board, so every unit sits exactly on its tenth.
+            if (detail == CalculatorHitPointDisplay.Nominal)
                 return HitPointBelief.Certain(unit.HealthPoints.Value * 10);
+
+            //The replay's own figure where it has one. Sonja's units, and anything it never wrote
+            //down, fall back to what could be worked out rather than to nothing.
+            if (detail == CalculatorHitPointDisplay.True && tryGetExactHitPoints(controller, unit, out var exact))
+                return HitPointBelief.Certain(exact);
 
             return controller.GetHitPointBelief(unit.UnitID) ?? HitPointBelief.ForDisplayed(unit.HealthPoints.Value);
         }
