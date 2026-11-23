@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 using AWBWApp.Game.Game.Building;
 using AWBWApp.Game.Game.Logic;
 using AWBWApp.Game.Game.Tile;
@@ -33,6 +34,16 @@ namespace AWBWApp.Game.UI.Replay
         private TerrainPopup terrainPopup;
         private BuildingPopup buildingPopup;
         private UnitPopup unitPopup;
+
+        /// <summary>
+        /// The replay being shown, used to recover exact hit points. Null outside a replay, such as in
+        /// the editor, where the popup falls back to the whole number everything else displays.
+        /// </summary>
+        public ReplayController ReplayController
+        {
+            get => unitPopup.ReplayController;
+            set => unitPopup.ReplayController = value;
+        }
 
         private Bindable<bool> playerListLeftSide;
         private Bindable<float> playerListScale;
@@ -374,12 +385,16 @@ namespace AWBWApp.Game.UI.Replay
 
         private partial class UnitPopup : Container
         {
+            private const float minimum_width = 50;
+
             private Container spriteContainer;
             private StatContainer unitHPCounter;
             private StatContainer unitAmmoCounter;
             private StatContainer unitFuelCounter;
 
             private DrawableUnit boundToUnit;
+
+            public ReplayController ReplayController { get; set; }
 
             [Resolved]
             private NearestNeighbourTextureStore textureStore { get; set; }
@@ -389,7 +404,7 @@ namespace AWBWApp.Game.UI.Replay
                 Anchor = Anchor.CentreLeft;
                 Origin = Anchor.CentreLeft;
                 AutoSizeAxes = Axes.Y;
-                Width = 50;
+                Width = minimum_width;
                 Masking = true;
                 CornerRadius = 8;
                 Children = new Drawable[]
@@ -439,15 +454,51 @@ namespace AWBWApp.Game.UI.Replay
                 unitSprite.Size *= 2;
 
                 Show();
-                unitHPCounter.BindTo(unit.HealthPoints);
+                unitHPCounter.SetText(getHealthText(unit));
                 unitAmmoCounter.BindTo(unit.Ammo);
                 unitFuelCounter.BindTo(unit.Fuel);
+            }
+
+            protected override void Update()
+            {
+                base.Update();
+
+                //Hit points are re-read every frame rather than bound, because the exact value depends
+                //on how far through the turn the replay is, not just on the unit.
+                if (boundToUnit != null)
+                    unitHPCounter.SetText(getHealthText(boundToUnit));
+
+                //Hit points carry a decimal place, so this popup is no longer a fixed width. The parent
+                //auto-sizes, so growing here widens the whole popup smoothly.
+                Width = Math.Max(minimum_width, Math.Max(unitHPCounter.RequiredWidth, Math.Max(unitAmmoCounter.RequiredWidth, unitFuelCounter.RequiredWidth)));
+            }
+
+            /// <summary>
+            /// Hit points to one decimal place. Unlike the board, which shows the whole number the game
+            /// itself shows, this is the real value AWBW tracks - when the replay records it. Where it
+            /// does not, the decimal is shown as '?' rather than guessed at.
+            /// </summary>
+            private string getHealthText(DrawableUnit unit)
+            {
+                //Sonja's day to day hides unit health. The board already respects this; so should this.
+                if (unit.HideHP)
+                    return "?";
+
+                if (ReplayController == null)
+                    return unit.HealthPoints.Value.ToString(CultureInfo.InvariantCulture);
+
+                if (ReplayController.TryGetExactHitPoints(unit.UnitID, out var exact))
+                    return exact.ToString("0.0", CultureInfo.InvariantCulture);
+
+                //All that is known is the ceiling the rest of the game displays, so a unit shown as
+                //"10.?" is really somewhere in 9.1 - 10.0.
+                return $"{unit.HealthPoints.Value.ToString(CultureInfo.InvariantCulture)}.?";
             }
 
             public void Reset()
             {
                 Hide();
-                unitHPCounter.SetTo(0);
+                unitHPCounter.SetText(string.Empty);
                 unitAmmoCounter.SetTo(0);
                 unitFuelCounter.SetTo(0);
                 boundToUnit = null;
@@ -456,10 +507,15 @@ namespace AWBWApp.Game.UI.Replay
 
         private partial class StatContainer : Container
         {
+            private const float edge_padding = 4;
+            private const float icon_size = 22;
+            private const float icon_to_text_spacing = 2;
+
             private Sprite sprite;
             private string texturePath;
 
             private RollingCounter<int> rollingCounter;
+            private SpriteText textCounter;
 
             private IBindable<int> bindableReference;
 
@@ -476,8 +532,8 @@ namespace AWBWApp.Game.UI.Replay
                     {
                         Anchor = Anchor.CentreLeft,
                         Origin = Anchor.CentreLeft,
-                        Size = new Vector2(22),
-                        Position = new Vector2(4, 0),
+                        Size = new Vector2(icon_size),
+                        Position = new Vector2(edge_padding, 0),
                         Child = sprite = new Sprite()
                         {
                             Anchor = Anchor.Centre,
@@ -488,10 +544,34 @@ namespace AWBWApp.Game.UI.Replay
                     {
                         Anchor = Anchor.CentreRight,
                         Origin = Anchor.CentreRight,
-                        Position = new Vector2(-4, 0),
+                        Position = new Vector2(-edge_padding, 0),
                         Font = new FontUsage("Roboto", weight: "Bold")
+                    },
+                    //Used instead of the rolling counter for stats that are not plain whole numbers,
+                    //such as hit points, which carry a decimal place and can be partly unknown.
+                    textCounter = new SpriteText()
+                    {
+                        Anchor = Anchor.CentreRight,
+                        Origin = Anchor.CentreRight,
+                        Position = new Vector2(-edge_padding, 0),
+                        Font = new FontUsage("Roboto", weight: "Bold"),
+                        Alpha = 0
                     }
                 };
+            }
+
+            /// <summary>
+            /// How wide this row needs to be for its icon and its value not to overlap. The icon is
+            /// pinned left and the value right, so a value that grows - "10.0" rather than "10" - runs
+            /// into the icon once the row is too narrow for both.
+            /// </summary>
+            public float RequiredWidth
+            {
+                get
+                {
+                    var valueWidth = textCounter.Alpha > 0 ? textCounter.DrawWidth : rollingCounter.DrawWidth;
+                    return edge_padding + icon_size + icon_to_text_spacing + valueWidth + edge_padding;
+                }
             }
 
             [BackgroundDependencyLoader]
@@ -505,12 +585,29 @@ namespace AWBWApp.Game.UI.Replay
             {
                 bindableReference = stat.GetBoundCopy();
                 bindableReference.BindValueChanged(x => rollingCounter.Current.Value = x.NewValue, true);
+
+                rollingCounter.Alpha = 1;
+                textCounter.Alpha = 0;
             }
 
             public void SetTo(int stat)
             {
                 bindableReference = null;
                 rollingCounter.Current.Value = stat;
+
+                rollingCounter.Alpha = 1;
+                textCounter.Alpha = 0;
+            }
+
+            public void SetText(string stat)
+            {
+                bindableReference = null;
+
+                if (textCounter.Text != stat)
+                    textCounter.Text = stat;
+
+                rollingCounter.Alpha = 0;
+                textCounter.Alpha = 1;
             }
         }
     }

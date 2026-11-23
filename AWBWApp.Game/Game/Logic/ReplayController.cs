@@ -64,6 +64,13 @@ namespace AWBWApp.Game.Game.Logic
         private TurnData currentTurn;
         private int currentActionIndex;
 
+        /// <summary>
+        /// Per turn, the first and last action index at which each unit's hit points changed.
+        /// Built during <see cref="setupActions"/> and used to work out whether a unit's exact
+        /// (fractional) hit points are knowable at a given point in the replay.
+        /// </summary>
+        private List<Dictionary<long, (int First, int Last)>> hitPointChangesPerTurn;
+
         private readonly LoadingLayer loadingLayer;
         private readonly Container powerLayer;
         private readonly CameraControllerWithGrid cameraControllerWithGrid;
@@ -421,6 +428,10 @@ namespace AWBWApp.Game.Game.Logic
 
             endTurnDesyncs = new Dictionary<int, EndTurnDesync>();
 
+            hitPointChangesPerTurn = new List<Dictionary<long, (int, int)>>(replayData.TurnData.Count);
+            for (int i = 0; i < replayData.TurnData.Count; i++)
+                hitPointChangesPerTurn.Add(new Dictionary<long, (int, int)>());
+
             for (int i = 0; i < replayData.TurnData.Count; i++)
             {
                 var nextTurn = replayData.TurnData[i];
@@ -446,12 +457,21 @@ namespace AWBWApp.Game.Game.Logic
                     if (nextTurn.Actions == null || nextTurn.Actions.Count == 0)
                         continue;
 
+                    var changesThisTurn = hitPointChangesPerTurn[i];
+                    var hitPointsBefore = new Dictionary<long, float>();
+
                     for (int j = 0; j < setupContext.CurrentTurn.Actions.Count; j++)
                     {
+                        hitPointsBefore.Clear();
+                        foreach (var unit in setupContext.Units)
+                            hitPointsBefore[unit.Key] = unit.Value.HitPoints ?? 0;
+
                         setupContext.CurrentActionIndex = j;
                         var action = nextTurn.Actions[j];
                         action.SetupAndUpdate(this, setupContext);
                         action.SuccessfullySetup = true;
+
+                        recordHitPointChanges(changesThisTurn, hitPointsBefore, setupContext.Units, j);
                     }
                 }
                 catch (Exception e)
@@ -463,6 +483,73 @@ namespace AWBWApp.Game.Game.Logic
             //Check to see if the replay properly ends, but only on versions that have actions.
             if (replayData.ReplayInfo.ReplayVersion >= 2)
                 setupContext.AddGameOverAction();
+        }
+
+        /// <summary>
+        /// Notes every unit whose hit points this action altered, so that <see cref="TryGetExactHitPoints"/>
+        /// can later tell whether a turn's starting snapshot still describes a unit.
+        /// </summary>
+        private static void recordHitPointChanges(Dictionary<long, (int First, int Last)> changes, Dictionary<long, float> before, Dictionary<long, ReplayUnit> after, int actionIndex)
+        {
+            foreach (var unit in after)
+            {
+                //A unit that did not exist before this action counts as changed: its hit points did
+                //not come from this turn's starting snapshot either.
+                if (before.TryGetValue(unit.Key, out var previous) && previous == (unit.Value.HitPoints ?? 0))
+                    continue;
+
+                changes[unit.Key] = changes.TryGetValue(unit.Key, out var range) ? (range.First, actionIndex) : (actionIndex, actionIndex);
+            }
+        }
+
+        /// <summary>
+        /// The exact, fractional hit points of a unit at the current point in the replay, when they can
+        /// be known at all.
+        /// </summary>
+        /// <remarks>
+        /// Actions only ever report hit points as integers - the ceiling of the real value - so the real
+        /// value is only ever written down in a turn's starting snapshot. A unit whose hit points changed
+        /// during the current turn is therefore resolved from the *next* turn's snapshot. That fails in
+        /// two cases: the unit is changed again later in this turn, so the value in between was never
+        /// recorded anywhere; or this is the last turn, and no snapshot follows it.
+        /// </remarks>
+        public bool TryGetExactHitPoints(long unitID, out float hitPoints)
+        {
+            hitPoints = 0;
+
+            if (replayData?.TurnData == null || hitPointChangesPerTurn == null)
+                return false;
+
+            var turnIndex = CurrentTurnIndex.Value;
+
+            if (turnIndex < 0 || turnIndex >= hitPointChangesPerTurn.Count)
+                return false;
+
+            //Nothing has touched this unit yet this turn, so the turn's own snapshot still describes it.
+            if (!hitPointChangesPerTurn[turnIndex].TryGetValue(unitID, out var range) || currentActionIndex < range.First)
+                return tryGetHitPointsFromTurn(turnIndex, unitID, out hitPoints);
+
+            //Something changes them again before the turn is out, so this intermediate value is lost.
+            if (currentActionIndex < range.Last)
+                return false;
+
+            return tryGetHitPointsFromTurn(turnIndex + 1, unitID, out hitPoints);
+        }
+
+        private bool tryGetHitPointsFromTurn(int turnIndex, long unitID, out float hitPoints)
+        {
+            hitPoints = 0;
+
+            if (turnIndex < 0 || turnIndex >= replayData.TurnData.Count)
+                return false;
+
+            var units = replayData.TurnData[turnIndex].ReplayUnit;
+
+            if (units == null || !units.TryGetValue(unitID, out var unit) || !unit.HitPoints.HasValue)
+                return false;
+
+            hitPoints = unit.HitPoints.Value;
+            return true;
         }
 
         public (int, int) GetLastTurnAndLastAction()

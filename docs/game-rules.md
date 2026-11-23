@@ -43,9 +43,36 @@ if (HitPoints.HasValue && (MathF.Ceiling(HitPoints.Value) != MathF.Ceiling(unit.
 return (int)(unit.Cost.Value * priceMultiplier * Math.Ceiling(unit.HitPoints.Value) * 0.1);
 ```
 
-So the fraction is parsed, carried through the setup context, and then discarded
-at every point where it would become visible. Nothing in the UI exposes it today
-— which is exactly the hook for surfacing it.
+So the fraction is rounded away everywhere the game itself would show a number.
+The board, the desync checks and unit value all work in whole numbers.
+
+### Recovering the exact value
+
+The one place the fraction is surfaced is the mouseover popup, via
+`ReplayController.TryGetExactHitPoints`. Getting there is harder than it looks,
+because **actions only ever report hit points as integers** — the exact value is
+written down only in a turn's starting snapshot.
+
+The setup pass therefore diffs `ReplaySetupContext.Units` before and after every
+action and records, per turn, the first and last action index at which each
+unit's hit points moved. Doing it by diffing rather than by asking each action
+means powers, joins, repairs and combat are all caught without any action class
+knowing about it. The lookup is then:
+
+| Position in the turn | Exact value comes from |
+|---|---|
+| before the first change | this turn's snapshot |
+| between the first and last change | **nowhere** — it was never recorded |
+| at or after the last change | the *next* turn's snapshot |
+
+Two cases are unresolvable by construction: a unit changed more than once in a
+turn has no record of the value in between, and the **last turn of a replay** has
+no snapshot after it. Both render as `10.?` in the popup, meaning "the ceiling is
+10, the decimal is unknown" — the true value is somewhere in 9.1–10.0.
+
+Worth knowing when reading values back: **a property repair adds 2.0 to the exact
+value, not to the displayed one.** A unit at 7.9 repairs to 9.9 while the action
+reports `10`, so repaired units stay fractional.
 
 ### Other HP rules
 

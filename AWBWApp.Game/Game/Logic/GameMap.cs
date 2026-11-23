@@ -213,6 +213,9 @@ namespace AWBWApp.Game.Game.Logic
         public void SetInfoPopup(DetailedInformationPopup popup)
         {
             InfoPopup = popup;
+
+            //Null in the editor, where there is no replay to read exact hit points out of.
+            popup.ReplayController = ReplayController;
         }
 
         public void SetToInitialGameState(ReplayData gameState, ReplayMap map)
