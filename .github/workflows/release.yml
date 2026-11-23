@@ -1,0 +1,118 @@
+name: Release
+
+# Cutting a release is pushing a tag. Everything below follows from that, and the version the
+# build is stamped with is the tag with its leading "v" removed.
+#
+# The version matters more than it looks: the app treats itself as a deployed build, and so
+# starts checking for updates, only once its assembly version is above 0.0. A build left at the
+# repository's own 0.0.0 will never update itself.
+
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build, without the leading v'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 6.0.x
+    - name: Restore dependencies
+      run: dotnet restore
+    - name: Build
+      run: dotnet build --no-restore
+    - name: Test
+      run: dotnet test --no-build --verbosity normal --filter "TestCategory!=NoCI"
+
+  windows:
+    needs: test
+    runs-on: windows-latest
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 6.0.x
+
+    - name: Work out the version
+      id: version
+      run: |
+        version="${{ github.event.inputs.version }}"
+        [ -n "$version" ] || version="${GITHUB_REF_NAME#v}"
+        echo "Building $version"
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+
+    - name: Publish
+      run: |
+        dotnet publish AWBWApp.Desktop/AWBWApp.Desktop.csproj \
+          -c Release -r win-x64 --self-contained true \
+          -p:Version=${{ steps.version.outputs.version }} \
+          -p:FileVersion=${{ steps.version.outputs.version }} \
+          -o publish
+
+    # Squirrel ships inside the Clowd.Squirrel package the desktop project already depends on, so
+    # the publish above has put it in the NuGet cache. Found rather than named, so that bumping
+    # that dependency does not quietly break this.
+    - name: Find Squirrel
+      id: squirrel
+      run: |
+        path=$(find "$USERPROFILE/.nuget/packages/clowd.squirrel" -name Squirrel.exe | head -1)
+        [ -n "$path" ] || { echo "Squirrel.exe is not in the NuGet cache"; exit 1; }
+        echo "path=$path" >> "$GITHUB_OUTPUT"
+
+    # Squirrel writes a delta against whatever it finds in the release directory, so pulling the
+    # last release down first is what keeps an update a few hundred KB rather than sixty MB. There
+    # is nothing to fetch for the first release, which is why this is allowed to fail.
+    - name: Fetch the previous release
+      continue-on-error: true
+      run: |
+        "${{ steps.squirrel.outputs.path }}" github-down \
+          -r Releases \
+          --repoUrl "${{ github.server_url }}/${{ github.repository }}" \
+          --token "${{ secrets.GITHUB_TOKEN }}"
+
+    - name: Pack
+      run: |
+        "${{ steps.squirrel.outputs.path }}" pack \
+          -u AWBWReplayPlayer \
+          -v ${{ steps.version.outputs.version }} \
+          -p publish \
+          -r Releases \
+          --packTitle "AWBW Replay Player" \
+          --packAuthors "DeamonHunter, Elagatua" \
+          -i AWBWApp.Desktop/game.ico
+
+    # Squirrel calls its installer Setup.exe. The name below is the one this project's releases
+    # have always used, and the one anyone looking for a download will recognise.
+    - name: Name the installer the way the releases do
+      run: mv Releases/AWBWReplayPlayerSetup.exe Releases/AWBWReplayPlayerInstaller.exe
+
+    # RELEASES and the nupkgs are not decoration: the in-app updater reads RELEASES to find out
+    # what is available and downloads the packages beside it. A release missing them installs fine
+    # and then never updates again.
+    - name: Publish the release
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh release create "v${{ steps.version.outputs.version }}" \
+          --title "v${{ steps.version.outputs.version }}" \
+          --generate-notes \
+          --target "${{ github.sha }}" \
+          Releases/*

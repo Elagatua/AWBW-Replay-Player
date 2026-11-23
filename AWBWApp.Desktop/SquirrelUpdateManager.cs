@@ -41,7 +41,10 @@ namespace AWBWApp.Desktop
 
             try
             {
-                updateManager ??= new GithubUpdateManager(@"https://github.com/DeamonHunter/AWBW-Replay-Player");
+                //This fork's own releases. Pointing at the repository this was forked from would have a
+                //build installed from here quietly replace itself with that one the first time it
+                //looked for an update, since anything with a version number checks on startup.
+                updateManager ??= new GithubUpdateManager(@"https://github.com/Elagatua/AWBW-Replay-Player");
                 Logger.Log("[Update] Checking for update.");
 
                 var info = await updateManager.CheckForUpdate(!useDeltaPatching).ConfigureAwait(false);
