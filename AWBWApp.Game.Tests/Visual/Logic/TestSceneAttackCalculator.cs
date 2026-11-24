@@ -311,6 +311,33 @@ namespace AWBWApp.Game.Tests.Visual.Logic
             AddStep("Put the setting back", () => config.SetValue(AWBWSetting.CalculatorHitPoints, CalculatorHitPointDisplay.Both));
         }
 
+        /// <summary>
+        /// The gesture's layer has to cover the map it draws on.
+        /// </summary>
+        /// <remarks>
+        /// A layer is only considered for drawing where its own bounds are, and this one's bounds
+        /// are not where its contents are: it draws at map coordinates while sitting, by default,
+        /// as a point in the map's top left corner. Zoom in far enough for that corner to leave
+        /// the screen and the ring and its lines stop being drawn, while every sibling layer -
+        /// each of which is told the map's size - carries on. The symptom lasts until something
+        /// brings the corner back, which is why loading another replay appeared to fix it.
+        /// </remarks>
+        [Test]
+        public void TestTheGestureCoversTheMapItDrawsOn()
+        {
+            setUpReplay("Tank", "Infantry", buildingUnderDefender: false);
+
+            AddAssert("The far corner of the map is inside it", () =>
+            {
+                var indicator = ReplayController.Map.ChildrenOfType<AttackCalculatorIndicator>().Single();
+
+                //The map is five tiles square, so this is the last tile it could ever draw on.
+                var corner = indicator.ToScreenSpace(AttackCalculatorIndicator.GetTileCentre(new Vector2I(4, 4)));
+
+                return indicator.ScreenSpaceDrawQuad.AABBFloat.Contains(corner);
+            });
+        }
+
         private void setUpReplay(string attackerUnit, string defenderUnit, bool buildingUnderDefender, bool mountainBelowDefender = false, bool damagedDefender = false)
         {
             AddStep($"Load {attackerUnit} against {defenderUnit}", () =>

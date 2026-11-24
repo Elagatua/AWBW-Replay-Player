@@ -87,6 +87,25 @@ The state file has `d:9.4`; everything else has `10`. Consequences:
 
 See [game-rules.md](game-rules.md#hit-points).
 
+## A map layer with no size stops being drawn
+
+Everything `GameMap` holds is a full-map layer, and `SetDrawableSize` tells each
+one how big the map is. That is not bookkeeping. A layer is only considered for
+drawing where **its own bounds** are, so a layer left at its default size is a
+point in the map's top left corner, however far across the map its contents are
+drawn.
+
+Nothing looks wrong until the camera moves. Zoom in until that corner leaves the
+screen and the whole layer stops being drawn, while every sibling carries on -
+and it stays gone until something brings the corner back, which is why loading
+another replay appeared to fix it.
+
+This cost a long hunt. It survived two rounds of plausible theories about fades
+and lifetimes, because the symptom - one drawable invisible, its siblings fine,
+transforms still running - looks nothing like a sizing problem.
+
+**Add a layer to `SetDrawableSize` when you add it to `GameMap`.**
+
 ## Player-keyed JSON
 
 `GetPlayerSpecificDataFromJObject` falls back `playerId -> teamName -> "global"`
