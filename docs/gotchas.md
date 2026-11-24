@@ -31,6 +31,33 @@ of the session and compounds. Checklist for any action that writes:
 Composite actions must undo in **reverse** order: own effect first, then the
 wrapped `Move`.
 
+## The setup pass can only be run once
+
+Actions are stateful. `SetupAndUpdate` stores what its undo will need on the
+action instance — `AttackUnitAction` fills an `originalUnits` dictionary — so
+running the pass a second time over the same `replayData` throws on its own
+leftovers (`An item with the same key has already been added`).
+
+There is no reset. If something needs the pass redone — a CO variant changing
+is the current case — read the replay again, which produces a fresh set of
+actions, and `LoadReplay` it. `ReplayController.SetCOVariant` is the worked
+example. Rebuilding the player list is a second reason to go that way: its items
+are built around one CO, and `onCOChange` throws
+`Player managed to change CO's during a match without tagging?` if the active CO
+turns into something that is not the tag CO.
+
+## A replay's index entry is replaced, not merged
+
+`ReplayStorage.json` caches a `ReplayInfo` per replay, and `addReplay` overwrites
+it wholesale with whatever the parse produced. A parse only knows what the file
+says, so anything the *user* set — `UserDefinedName`, `COVariants` — is not in
+it. `CarryOverUserChoicesFrom` exists to put those back; extend it when you add
+another field the user controls.
+
+Re-parsing is not rare. It happens for any replay not already indexed, and
+`ReplayManager` also re-reads entries that predate a field it now needs, which is
+how a change to `ReplayInfo` quietly rewrites the whole library.
+
 ## `Overwrite` merges; it does not assign
 
 ```csharp
@@ -91,6 +118,31 @@ resignation can therefore fall through to `AddGameOverAction` and display
 `Match ended in Draw!`. If you are synthesising an ending, prefer an `End` action
 with `updatedInfo.event = "GameOver"`.
 
+## Some AWBW numbers are flags wearing a number's clothes
+
+Two fields carry meaning in a way that reads as ordinary data:
+
+- A **negative** `co_max_spower` means the CO has no super power, not that it
+  costs a strange amount. Its magnitude still escalates normally, so only the
+  sign says anything. Read as a real requirement it builds a power meter with
+  negative bar widths, then throws on the next CO update.
+- A **numeric** `weather_code` is the number of days a CO-induced weather has
+  left, not a weather. `ParseWeatherCode` only knows letters; use
+  `TryParseTimedWeatherCode` and let `ReplayPostProcessor` resolve it from the
+  power that set it.
+
+Both are documented in [replay-format.md](replay-format.md#co-power-meters).
+Assume a new number is a flag until you have seen it vary.
+
+## Luck can exceed the attack
+
+Luck is added before anything scales it, and Sonja, Flak and Jugger roll it
+negative — down to `-44` under Jugger's super. A weak enough attack therefore
+computes as *negative* damage, which is why `DamageCalculator` floors it at zero.
+Anything consuming `DamageResult.Outcomes` is entitled to assume damage is not
+negative; `HitPointBelief.WithDamage` indexes an array by `hitPoints - damage`
+and would walk off the end of it.
+
 ## The parser throws on anything new
 
 Unknown keys, changed-per-turn header fields, unknown CO/power combinations,
@@ -134,6 +186,18 @@ will not raise a desync warning.
 `GameMap.SetToInitialGameState` asserts it. Work triggered from parsing or IO
 goes through `Schedule` / `ScheduleAfterChildren`; `ScheduleLoadReplay` exists
 for exactly this reason.
+
+## A green test run does not mean the app has your change
+
+`dotnet test` builds the test project and what it references, which includes
+`AWBWApp.Resources` — but not `AWBWApp.Desktop`. The desktop output keeps its own
+copies of those assemblies, so after changing anything under `AWBWApp.Resources`
+(a texture, a JSON file) the tests can pass against the new data while the
+running app still shows the old. Build `AWBWApp.Desktop.slnf` before believing
+what the window tells you.
+
+The app also holds those assemblies open while it runs, so a build will fail with
+`MSB3027 … being used by another process` until you close it.
 
 ## Visual tests open a window
 

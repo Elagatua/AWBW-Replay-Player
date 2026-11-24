@@ -37,6 +37,14 @@ is all the registration needed.
 `HasVisibleAction` lets the UI skip actions that are entirely under fog for the
 current view.
 
+**Setup happens once per action instance, and cannot be repeated.** The "before"
+state an action records is written to its own fields, and nothing clears them, so
+a second pass over the same action adds to collections that are already full and
+throws. Anything that needs the whole replay set up again — a CO variant
+changing, say — has to re-read the replay to get fresh action instances rather
+than calling the pass twice. Perform and Undo, by contrast, are meant to run many
+times, which is why they must be exact inverses.
+
 ### Reading an action: `MoveUnitAction`
 
 [MoveAction.cs](../AWBWApp.Game/API/Replay/Actions/MoveAction.cs) is the template

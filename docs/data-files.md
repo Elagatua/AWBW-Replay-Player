@@ -155,6 +155,55 @@ AWBW ids. Never write a 1000+ id back into replay or map data.
 `PowerActionBuilder.compatibleCOs` is a separate whitelist of `<CO>-Y` / `<CO>-S`
 strings; a power from a CO not on it throws rather than mis-rendering.
 
+### CO variants
+
+**An AWBW id does not identify a CO.** A tournament can rework one without giving
+it an id of its own — the 2026 Mini Amarriner Cup replaces COs with their AW1 and
+AWDS selves for the rounds they are played in — so several entries may answer to
+the same `AWBWID`. A variant names the CO it stands in for:
+
+```json
+"DS Olaf": {
+    "Name": "DS Olaf", "AWBWID": 9, "VariantOf": "Olaf", ...
+}
+```
+
+`COStorage` keeps variants in an index beside the COs AWBW plays by default
+rather than among them:
+
+| Call | Answers with |
+|---|---|
+| `GetCOByAWBWId(9)` | `Olaf` — the default, and what a replay means unless something says otherwise |
+| `GetCOsSharingAWBWId(9)` | `Olaf`, `DS Olaf`, `AW1 Olaf` — default first |
+| `GetCOPlayed(9, hasSuperPower)` | the variant without a super power, where the replay says there is none |
+
+Loading validates the relationship and throws on: a variant of a CO that does not
+exist, a variant of a variant, a variant whose `AWBWID` differs from its base's,
+and two variants of one CO that both lost their super power. The id check matters
+most — a replay only ever reports the *base* id, so a variant carrying its own
+would load cleanly and then never match a game.
+
+**Which variant a replay used is usually unknowable.** The only thing AWBW
+records that differs is a missing power, as a negative `co_max_spower` (see
+[replay-format.md](replay-format.md#co-power-meters)). That identifies the AW1
+COs, because each is the only no-super variant of its id. The DS reworks keep
+both powers *and* their star costs *and* their power names, so nothing in the
+file distinguishes them — they are chosen by hand, per replay, and the choice is
+kept in `ReplayUser.COVariants` in the replay index.
+
+Two consequences worth knowing:
+
+- **Portraits resolve from `Name`**, so `DS Olaf` needs `CO/DS Olaf-Small`. A
+  missing portrait draws nothing and reports nothing, which is why
+  `TestCOPortraits` holds every CO to having one. Full body art is only ever
+  asked for by the name the *replay* reports, which is always the base CO, so
+  variants need none.
+- **The damage charts know nothing about variants.** `AttackSituation.CO` is
+  deliberately the base CO's name, because an unknown name in
+  `DamageChartStorage` means no modifiers at all — further from the truth than
+  the CO being reworked. Until the charts gain rows, a variant displays correctly
+  and still computes as its original.
+
 ## Countries.json
 
 ```json
