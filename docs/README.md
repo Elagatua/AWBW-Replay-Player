@@ -16,7 +16,7 @@ interesting part.
 | [data-files.md](data-files.md) | `Units.json`, `Tiles.json`, `Buildings.json`, `COs.json`, `Countries.json`, terrain caching |
 | [damage.md](damage.md) | The damage formula and its charts — the one rule this program computes rather than reads |
 | [gotchas.md](gotchas.md) | Non-obvious traps, ranked by how much time they cost |
-| [releases.md](releases.md) | Cutting a release: what the tag does, what each platform ships, and what the updater needs |
+| [releases.md](releases.md) | Cutting a release: which repository and which version series, the path from branch to tag, what each platform ships, and what the updater needs |
 
 ## The three things most likely to bite you
 
