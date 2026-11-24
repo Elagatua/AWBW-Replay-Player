@@ -404,6 +404,88 @@ namespace AWBWApp.Game.Tests.StorageTests
             Assert.That(result.Outcomes.Select(x => x.Damage), Has.All.GreaterThanOrEqualTo(0));
         }
 
+        /// <summary>
+        /// A variant only carries rows where its numbers differ, so one with none at all has to
+        /// behave exactly like the CO it stands in for.
+        /// </summary>
+        [Test]
+        public void AVariantWithNoRowsOfItsOwnFightsLikeItsBase()
+        {
+            var asKanbei = calculator.Calculate(situation("Tank", "Tank", attackerCO: "Kanbei", defenderCO: "Kanbei"));
+
+            var asVariant = situation("Tank", "Tank", attackerCO: "Pretend Kanbei", defenderCO: "Pretend Kanbei");
+            asVariant.Attacker.BaseCO = "Kanbei";
+            asVariant.Defender.BaseCO = "Kanbei";
+
+            Assert.That(calculator.Calculate(asVariant).Outcomes.Select(x => x.Damage),
+                Is.EqualTo(asKanbei.Outcomes.Select(x => x.Damage)));
+        }
+
+        /// <summary>
+        /// The rules that single a CO out by name mean the variant too. Sonja's counterattack
+        /// bonus is the one that bites: comparing display names would quietly drop it.
+        /// </summary>
+        [Test]
+        public void AVariantOfSonjaStillCountersLikeSonja()
+        {
+            var counter = situation("Tank", "Tank", attackerCO: "Andy", defenderCO: "DS Sonja", counter: true);
+            counter.Defender.BaseCO = "Sonja";
+
+            var asSonja = situation("Tank", "Tank", attackerCO: "Andy", defenderCO: "Sonja", counter: true);
+            var asAndy = situation("Tank", "Tank", attackerCO: "Andy", defenderCO: "Andy", counter: true);
+
+            Assert.That(calculator.Calculate(counter).Outcomes.Select(x => x.Damage),
+                Is.EqualTo(calculator.Calculate(asSonja).Outcomes.Select(x => x.Damage)));
+
+            Assert.That(calculator.Calculate(counter).Outcomes.Select(x => x.Damage),
+                Is.Not.EqualTo(calculator.Calculate(asAndy).Outcomes.Select(x => x.Damage)),
+                "If this matches Andy, the counterattack multiplier was lost.");
+        }
+
+        /// <summary>
+        /// Luck falls back too, which is what keeps a variant of Sonja rolling her weighted dice
+        /// rather than a flat 0 to 9.
+        /// </summary>
+        [Test]
+        public void AVariantInheritsItsBasesLuck()
+        {
+            var variant = situation("Tank", "Tank", attackerCO: "Pretend Sonja");
+            variant.Attacker.BaseCO = "Sonja";
+
+            var spread = calculator.Calculate(variant).Outcomes.Count;
+
+            Assert.That(spread, Is.EqualTo(calculator.Calculate(situation("Tank", "Tank", attackerCO: "Sonja")).Outcomes.Count));
+            Assert.That(spread, Is.Not.EqualTo(calculator.Calculate(situation("Tank", "Tank", attackerCO: "Andy")).Outcomes.Count));
+        }
+
+        /// <summary>
+        /// The hand-maintained rows are the ones a regeneration would wipe, so the list naming
+        /// them has to stay true to what is actually in the file.
+        /// </summary>
+        [Test]
+        public void EveryHandMaintainedRowIsNamedAndPresent()
+        {
+            Assert.That(charts.HandMaintainedCORows, Is.Not.Empty);
+
+            foreach (var row in charts.HandMaintainedCORows)
+                Assert.That(charts.HasCORow(row), Is.True, $"{row} is listed as hand-maintained but has no row.");
+
+            var coStorage = new COStorage();
+
+            using (var stream = new DllResourceStore(typeof(AWBWAppResources).Assembly).GetStream("Json/COs.json"))
+                coStorage.LoadStream(stream);
+
+            //A variant's rows can only have been written by hand, so any that exist must be listed.
+            foreach (var co in coStorage.GetAllCOs().Where(x => x.IsVariant))
+            {
+                foreach (var state in new[] { co.Name, co.Name + "-COP", co.Name + "-SCOP" })
+                {
+                    if (charts.HasCORow(state))
+                        Assert.That(charts.HandMaintainedCORows, Does.Contain(state), $"{state} is a variant row but is not listed as hand-maintained.");
+                }
+            }
+        }
+
         private (int, int) luckBounds(string coState)
         {
             var rolls = charts.GetLuckRolls(coState).Keys.Select(int.Parse).ToList();

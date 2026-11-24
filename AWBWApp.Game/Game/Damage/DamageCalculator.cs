@@ -57,20 +57,20 @@ namespace AWBWApp.Game.Game.Damage
             if (!tryChooseWeapon(attacker, defender, out var baseDamage, out var usedSecondary))
                 return DamageResult.CANNOT_ATTACK;
 
-            var attackModifier = charts.GetAttackModifier(attacker.COState, attacker.Unit.Name)
-                                 + charts.GetTerrainAttackModifier(attacker.COState, attacker.Terrain)
+            var attackModifier = charts.GetAttackModifier(attacker.COState, attacker.Unit.Name, attacker.BaseCOState)
+                                 + charts.GetTerrainAttackModifier(attacker.COState, attacker.Terrain, attacker.BaseCOState)
                                  + attacker.ComTowers
                                  + getStateDependentAttackModifier(attacker);
 
-            var defenceModifier = charts.GetDefenceModifier(defender.COState, defender.Unit.Name);
+            var defenceModifier = charts.GetDefenceModifier(defender.COState, defender.Unit.Name, defender.BaseCOState);
 
             //Javier's whole gimmick, and the only entry in that table.
             if (IsIndirect(attacker.Unit))
-                defenceModifier += charts.GetDefenceModifierAgainstIndirects(defender.COState);
+                defenceModifier += charts.GetDefenceModifierAgainstIndirects(defender.COState, defender.BaseCOState);
 
             var firepower = 1 + attackModifier * 0.1;
 
-            if (situation.IsCounterAttack && defender.CO == sonja)
+            if (situation.IsCounterAttack && defender.IsCO(sonja))
                 firepower *= sonja_counter_multiplier;
 
             //A unit at 3 hit points hits at three tenths strength.
@@ -88,7 +88,7 @@ namespace AWBWApp.Game.Game.Damage
             int damageForLuck(int luck) =>
                 Math.Max(0, (int)Math.Truncate((baseDamage * firepower + luck) * attackerStrength * resistance + 0.05));
 
-            var outcomes = buildOutcomes(charts.GetLuckRolls(attacker.COState), damageForLuck);
+            var outcomes = buildOutcomes(charts.GetLuckRolls(attacker.COState, attacker.BaseCOState), damageForLuck);
 
             return new DamageResult
             {
@@ -278,12 +278,12 @@ namespace AWBWApp.Game.Game.Damage
 
             //Colin's Power of Money: +3% for every 1000 funds in the bank, scaling continuously -
             //a partial thousand pays out its share, as the website's own calculator does.
-            if (state.CO == colin)
+            if (state.IsCO(colin))
                 return state.Funds / 1000.0 * 0.3;
 
             //Kindle's High Society: +3% for every city held, on top of her urban bonus. AWBW
             //counts cities alone here, where the home games counted every property.
-            if (state.CO == kindle)
+            if (state.IsCO(kindle))
                 return state.Cities * 0.3;
 
             return 0;

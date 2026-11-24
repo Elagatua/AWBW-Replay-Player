@@ -22,8 +22,64 @@ Where AWBW deviates from the cartridge games, the
 [AWBW wiki's changes page](https://awbw.fandom.com/wiki/Changes_in_AWBW) is the
 authority. The deviations that matter here are already baked into the charts.
 
-**Do not hand-edit `DamageChart.json`.** It is generated. If the charts need to
+**Do not hand-edit the generated rows in `DamageChart.json`.** If they need to
 change, change the spreadsheet and regenerate.
+
+### The rows the spreadsheet does not cover
+
+Tournament CO variants are the exception, and they are marked as such. The
+`HandMaintainedCORows` list at the top of the file names every CO row that was
+**not** generated, and `TestDamageCalculator` fails if that list drifts from
+what is actually in the file or from the variants in `COs.json`.
+
+Treat those numbers as **provisional**. They were read off the Mini Amarriner
+Cup's own tier chart — a PNG — and converted using the convention the generated
+rows follow:
+
+```
+power row = day-to-day + the power's own bonus + the universal +10%
+```
+
+That universal +10% applies to **both** attack and defence on any active power,
+which is visible in the generated data: `Kanbei` 3/3 → `Kanbei-COP` 5/4 →
+`Kanbei-SCOP` 5/6. Two further conventions worth copying when adding a row:
+
+- **Unarmed units are 0 in every attack row** — APC, Black Boat, Black Bomb,
+  Lander and T-Copter. They are given real values in *defence* rows, because
+  anything can be attacked.
+- A variant needs a row **only where its numbers differ** from the CO it stands
+  in for. `CombatantState.BaseCO` makes every lookup fall back, so Clone Andy,
+  AW1 Olaf and AW1 Drake need no rows at all.
+
+Two readings in there are worth revisiting rather than trusting:
+
+- Whether a tier chart's *"attack is increased to +50%"* is the final figure or
+  sits beneath the universal +10%. It is taken as final, which makes DS Kanbei's
+  power equal vanilla Kanbei's 5 — self-consistent, but a reading.
+- DS Jess's `-COP` and `-SCOP` values, which depend on the same question.
+
+Both could be settled by back-deriving from a real replay: the action stream
+records the damage an attack actually did, so a known attacker, defender,
+terrain and power pin the modifier. If the spreadsheet ever adds these COs, it
+becomes the reference again and these rows should be regenerated from it.
+
+### What no row can express
+
+Three variant abilities are not modifiers and cannot be written as chart rows:
+
+| CO | Ability | Why it does not fit |
+|---|---|---|
+| DS Sonja | Enemies in combat lose 1–3 terrain stars | Terrain stars are the defender's, read from the map |
+| DS Sonja | Defender attacks first under Counter Break | The calculator has no ordering; `COPower.AttackFirst` is recorded and unused |
+| DS Olaf | +20% firepower **while it is snowing** | No row is conditional on weather |
+| AW1 Drake | Naval units gain +2 terrain stars | Same as DS Sonja's, in the other direction |
+
+DS Sonja's luck is also still her original `-9…+9`; the tier chart gives her
+range as `-4%` to `+9%` but not the weighting, and her distribution is a weighted
+two-dice spread rather than a flat range.
+
+AW1 Max has no rows either: his power's *+27% firepower* is ambiguous as to
+whether it is additional or total, and no replay exists to settle it.
 
 ## The formula
 
@@ -302,10 +358,12 @@ anyone relies on it.
 
 ## Regenerating the chart
 
-The extractor is not checked in; the spreadsheet is the source. An ODS file is a
-zip of XML, so the formulas can be read directly rather than guessed at from
-cached values — which is how the formula above was recovered. Unzip
-`content.xml` and read:
+The extractor is not checked in; the spreadsheet is the source for every row
+except those named in `HandMaintainedCORows`, which it must **merge around
+rather than replace** — those COs are not in the spreadsheet and regenerating
+over them deletes them. An ODS file is a zip of XML, so the formulas can be read
+directly rather than guessed at from cached values — which is how the formula
+above was recovered. Unzip `content.xml` and read:
 
 | Sheet | Rows | Holds |
 |---|---|---|

@@ -1251,6 +1251,7 @@ namespace AWBWApp.Game.Game.Logic
                 HitPoints = unit.HealthPoints.Value,
                 Ammo = unit.Ammo.Value,
                 CO = player.ActiveCO.Value.CO?.Name,
+                BaseCO = player.ActiveCO.Value.CO?.VariantOf,
                 Power = player.ActivePower.Value,
                 ComTowers = Map.CountBuildingsForPlayer("ComTower", player.ID),
                 Cities = Map.CountBuildingsForPlayer("City", player.ID),
