@@ -58,7 +58,7 @@ namespace AWBWApp.Game.Game.Logic
 
             ActiveCO.Value = new COInfo
             {
-                CO = coStorage.GetCOByAWBWId(turn.ActiveCOID),
+                CO = coStorage.GetCOPlayedBy(turn),
                 Power = turn.Power,
                 PowerRequiredForNormal = turn.RequiredPowerForNormal,
                 PowerRequiredForSuper = turn.RequiredPowerForSuper
@@ -66,7 +66,7 @@ namespace AWBWApp.Game.Game.Logic
 
             TagCO.Value = new COInfo
             {
-                CO = turn.TagCOID.HasValue ? coStorage.GetCOByAWBWId(turn.TagCOID.Value) : null,
+                CO = coStorage.GetTagCOPlayedBy(turn),
                 Power = turn.TagPower,
                 PowerRequiredForNormal = turn.TagRequiredPowerForNormal,
                 PowerRequiredForSuper = turn.TagRequiredPowerForSuper

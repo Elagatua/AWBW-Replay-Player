@@ -168,7 +168,7 @@ namespace AWBWApp.Game.API.Replay.Actions
                     if (!originalUnits.ContainsKey(repairedPair.Key))
                         originalUnits.Add(repairedPair.Key, repaired.Clone());
 
-                    var dayToDay = controller.COStorage.GetCOByAWBWId(context.PlayerTurns[repaired.PlayerID!.Value].ActiveCOID).DayToDayPower;
+                    var dayToDay = controller.COStorage.GetCOPlayedBy(context.PlayerTurns[repaired.PlayerID!.Value]).DayToDayPower;
 
                     var originalValue = ReplayActionHelper.CalculateUnitCost(repaired, dayToDay, null);
 
@@ -194,7 +194,7 @@ namespace AWBWApp.Game.API.Replay.Actions
 
                     if (unitData.MovementType == MovementType.Air)
                     {
-                        var dayToDay = controller.COStorage.GetCOByAWBWId(context.PlayerTurns[unit.Value.PlayerID!.Value].ActiveCOID).DayToDayPower;
+                        var dayToDay = controller.COStorage.GetCOPlayedBy(context.PlayerTurns[unit.Value.PlayerID!.Value]).DayToDayPower;
                         fuelUsage -= dayToDay.AirFuelUsageDecrease;
                     }
 

@@ -3,8 +3,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using AWBWApp.Game.API.Replay;
+using AWBWApp.Game.Game.COs;
 using AWBWApp.Game.Game.Logic;
+using AWBWApp.Resources;
 using NUnit.Framework;
+using osu.Framework.IO.Stores;
 
 namespace AWBWApp.Game.Tests.Replays
 {
@@ -32,6 +35,11 @@ namespace AWBWApp.Game.Tests.Replays
 
             if (replays.Length == 0)
                 Assert.Ignore($"`{directory}` contains no replays.");
+
+            var coStorage = new COStorage();
+
+            using (var stream = new DllResourceStore(typeof(AWBWAppResources).Assembly).GetStream("Json/COs.json"))
+                coStorage.LoadStream(stream);
 
             var failures = new List<string>();
 
@@ -66,6 +74,19 @@ namespace AWBWApp.Game.Tests.Replays
                         //it was never resolved at all.
                         if (turn.StartWeather?.DaysRemaining != null && turn.StartWeather.Type == WeatherType.Clear)
                             failures.Add($"{Path.GetFileName(replay)}: day {turn.Day} left a {turn.StartWeather.DaysRemaining} day weather unresolved.");
+
+                        //A player the replay gave no super power to must resolve to a CO that has
+                        //none, or the variant standing in went unrecognised.
+                        foreach (var player in turn.Players)
+                        {
+                            if (player.Value.RequiredPowerForSuper.HasValue)
+                                continue;
+
+                            var co = coStorage.GetCOPlayedBy(player.Value);
+
+                            if (co.SuperPower != null)
+                                failures.Add($"{Path.GetFileName(replay)}: day {turn.Day} resolved a CO with no super power to {co.Name}, which has one.");
+                        }
                     }
                 }
                 catch (Exception e)

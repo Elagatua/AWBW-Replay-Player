@@ -87,7 +87,7 @@ namespace AWBWApp.Game.API.Replay.Actions
             fundsChange = FundsAfterJoin - context.FundsValuesForPlayers[context.ActivePlayerID];
             context.FundsValuesForPlayers[context.ActivePlayerID] = FundsAfterJoin;
 
-            var dayToDay = controller.COStorage.GetCOByAWBWId(context.PlayerTurns[context.ActivePlayerID].ActiveCOID).DayToDayPower;
+            var dayToDay = controller.COStorage.GetCOPlayedBy(context.PlayerTurns[context.ActivePlayerID]).DayToDayPower;
             var originalJoiningUnitValue = ReplayActionHelper.CalculateUnitCost(originalJoiningUnit, dayToDay, null);
             var originalJoinedUnitValue = ReplayActionHelper.CalculateUnitCost(originalJoinedUnit, dayToDay, null);
             var joinedUnitValueChange = ReplayActionHelper.CalculateUnitCost(JoinedUnit, dayToDay, null);

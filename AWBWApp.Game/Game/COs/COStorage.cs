@@ -48,8 +48,42 @@ namespace AWBWApp.Game.Game.COs
                 if (!variantsByAWBWId.TryGetValue(co.AWBWID, out var variants))
                     variantsByAWBWId[co.AWBWID] = variants = new List<COData>();
 
+                //Losing a power is the one difference a replay reports, so two variants of the
+                //same CO that both lost one could never be told apart. See GetCOPlayed.
+                if (co.SuperPower == null && baseCO.SuperPower != null && variants.Any(x => x.SuperPower == null))
+                    throw new Exception($"'{co.Name}' is not the only variant of '{co.VariantOf}' without a super power, so neither can be recognised.");
+
                 variants.Add(co);
             }
+        }
+
+        /// <summary>
+        /// The CO that was actually played, as far as the replay can say.
+        /// </summary>
+        /// <param name="id">The CO id the replay reports.</param>
+        /// <param name="hasSuperPower">Whether the replay gave that player a super power to charge.</param>
+        /// <remarks>
+        /// A variant usually looks exactly like the CO it stands in for: same id, same name in the
+        /// action stream, same star costs. The one exception is a variant that lost a power, which
+        /// AWBW reports by marking its requirement absent. Where a replay says a CO has no super
+        /// power, the variant without one is the CO that was played.
+        /// <para>
+        /// Variants that keep their base's powers, such as the DS reworks, are indistinguishable
+        /// here and have to be chosen by hand. Falling back to the base CO is the same answer this
+        /// program gave before it knew variants existed.
+        /// </para>
+        /// </remarks>
+        public COData GetCOPlayed(int id, bool hasSuperPower)
+        {
+            var co = GetCOByAWBWId(id);
+
+            if (hasSuperPower || co.SuperPower == null)
+                return co;
+
+            if (!variantsByAWBWId.TryGetValue(id, out var variants))
+                return co;
+
+            return variants.FirstOrDefault(x => x.SuperPower == null) ?? co;
         }
 
         /// <summary>

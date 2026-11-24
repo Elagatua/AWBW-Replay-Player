@@ -374,6 +374,10 @@ namespace AWBWApp.Game.Game.Damage
                 Unit = unitData,
                 HitPoints = displayedHitPoints(unit),
                 Ammo = unit.Ammo ?? unitData.MaxAmmo,
+                //Deliberately the CO AWBW plays by default rather than the variant standing in for
+                //it: this name keys the damage charts, and they have no rows for variants yet. A
+                //variant would silently fall back to no modifiers at all, which is further from
+                //the truth than the CO it reworks.
                 CO = coStorage.GetCOByAWBWId(turn.ActiveCOID)?.Name,
                 Power = turn.COPowerOn,
                 ComTowers = countBuildings(context, unit.PlayerID.Value, "ComTower"),

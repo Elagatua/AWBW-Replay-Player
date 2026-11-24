@@ -17,6 +17,7 @@ namespace AWBWApp.Game.Tests.StorageTests
     {
         private const string base_co = @"""Olaf"": { ""Name"": ""Olaf"", ""AWBWID"": 9, ""NormalPower"": { ""PowerStars"": 3 }, ""SuperPower"": { ""PowerStars"": 7 } }";
         private const string variant_co = @"""DS Olaf"": { ""Name"": ""DS Olaf"", ""AWBWID"": 9, ""VariantOf"": ""Olaf"", ""NormalPower"": { ""PowerStars"": 3 }, ""SuperPower"": { ""PowerStars"": 7 } }";
+        private const string no_super_co = @"""AW1 Olaf"": { ""Name"": ""AW1 Olaf"", ""AWBWID"": 9, ""VariantOf"": ""Olaf"", ""NormalPower"": { ""PowerStars"": 3 } }";
 
         [Test]
         public void AVariantSharesItsBasesIdWithoutDisplacingIt()
@@ -80,8 +81,53 @@ namespace AWBWApp.Game.Tests.StorageTests
         }
 
         /// <summary>
-        /// The shipped data has no variants yet, but every CO in it must still be well formed by
-        /// the rules above.
+        /// A variant that lost its super power is the one a replay can recognise by itself.
+        /// </summary>
+        [Test]
+        public void ACOWithNoSuperPowerResolvesToTheVariantThatHasNone()
+        {
+            var storage = load($"{{ {base_co}, {variant_co}, {no_super_co} }}");
+
+            Assert.That(storage.GetCOPlayed(9, hasSuperPower: true).Name, Is.EqualTo("Olaf"));
+            Assert.That(storage.GetCOPlayed(9, hasSuperPower: false).Name, Is.EqualTo("AW1 Olaf"));
+        }
+
+        /// <summary>
+        /// Falling back to the base CO is the answer this program gave before it knew variants
+        /// existed, so an id we have no variant for is no worse off than it was.
+        /// </summary>
+        [Test]
+        public void ACOWithNoSuperPowerAndNoVariantFallsBackToItself()
+        {
+            var storage = load($"{{ {base_co} }}");
+
+            Assert.That(storage.GetCOPlayed(9, hasSuperPower: false).Name, Is.EqualTo("Olaf"));
+        }
+
+        [Test]
+        public void TwoVariantsOfOneCOCannotBothLoseTheirSuperPower()
+        {
+            var second = @"""Also AW1 Olaf"": { ""Name"": ""Also AW1 Olaf"", ""AWBWID"": 9, ""VariantOf"": ""Olaf"", ""NormalPower"": { ""PowerStars"": 3 } }";
+
+            Assert.That(() => load($"{{ {base_co}, {no_super_co}, {second} }}"), Throws.Exception.With.Message.Contains("neither can be recognised"));
+        }
+
+        /// <summary>
+        /// Von Bolt has no normal power and no variants. Asking which CO was played must not
+        /// mistake him for something that lost a power.
+        /// </summary>
+        [Test]
+        public void ACOThatSimplyHasNoSuperPowerIsLeftAlone()
+        {
+            var onlyNormal = @"""Lonely"": { ""Name"": ""Lonely"", ""AWBWID"": 31, ""NormalPower"": { ""PowerStars"": 3 } }";
+
+            var storage = load($"{{ {onlyNormal} }}");
+
+            Assert.That(storage.GetCOPlayed(31, hasSuperPower: false).Name, Is.EqualTo("Lonely"));
+        }
+
+        /// <summary>
+        /// Every CO in the shipped data must be well formed by the rules above.
         /// </summary>
         [Test]
         public void TheShippedDataLoads()
