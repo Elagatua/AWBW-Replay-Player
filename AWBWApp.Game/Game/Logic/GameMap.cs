@@ -226,6 +226,13 @@ namespace AWBWApp.Game.Game.Logic
             BuildingGrid.Size = size;
             UnitsDrawable.Size = size;
             effectAnimationController.Size = size;
+
+            //The attack calculator's gesture draws at map coordinates inside a layer of its own,
+            //and that layer has to be told how big the map is like every other one here. Left at
+            //nothing it is a point in the map's top left corner, and a layer is only considered
+            //for drawing where its own bounds are: zoom in far enough for that corner to leave
+            //the screen and the whole gesture stops being drawn, while every sibling carries on.
+            attackCalculatorIndicator.Size = size;
         }
 
         public void SetInfoPopup(DetailedInformationPopup popup)
