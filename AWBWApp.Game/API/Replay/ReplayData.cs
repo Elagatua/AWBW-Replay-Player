@@ -9,6 +9,35 @@ namespace AWBWApp.Game.API.Replay
     {
         public ReplayInfo ReplayInfo = new ReplayInfo();
         public List<TurnData> TurnData = new List<TurnData>();
+
+        /// <summary>
+        /// Pushes each player's chosen CO variants onto every turn, so that asking a turn which CO
+        /// was played gives the same answer wherever it is asked.
+        /// </summary>
+        /// <remarks>
+        /// Call this after the choices change, and run the setup pass again: a CO's day to day
+        /// feeds unit value and property income, which are worked out up front.
+        /// </remarks>
+        public void ApplyCOVariantChoices()
+        {
+            foreach (var turn in TurnData)
+            {
+                if (turn.Players == null)
+                    continue;
+
+                foreach (var playerTurn in turn.Players)
+                {
+                    if (!ReplayInfo.Players.TryGetValue(playerTurn.Key, out var player))
+                        continue;
+
+                    playerTurn.Value.COVariantName = chosenCO(player, playerTurn.Value.ActiveCOID);
+                    playerTurn.Value.TagCOVariantName = playerTurn.Value.TagCOID.HasValue ? chosenCO(player, playerTurn.Value.TagCOID.Value) : null;
+                }
+            }
+        }
+
+        private static string chosenCO(ReplayUser player, int coID)
+            => player.COVariants != null && player.COVariants.TryGetValue(coID, out var name) ? name : null;
     }
 
     public class ReplayInfo
@@ -46,6 +75,27 @@ namespace AWBWApp.Game.API.Replay
         public string GetDisplayName()
         {
             return UserDefinedName ?? Name;
+        }
+
+        /// <summary>
+        /// Copies across everything the user chose by hand, which reading the replay again cannot
+        /// recover because the file never said it.
+        /// </summary>
+        public void CarryOverUserChoicesFrom(ReplayInfo previous)
+        {
+            if (previous == null)
+                return;
+
+            UserDefinedName ??= previous.UserDefinedName;
+
+            if (previous.Players == null || Players == null)
+                return;
+
+            foreach (var player in Players)
+            {
+                if (previous.Players.TryGetValue(player.Key, out var previousPlayer))
+                    player.Value.COVariants ??= previousPlayer.COVariants;
+            }
         }
     }
 

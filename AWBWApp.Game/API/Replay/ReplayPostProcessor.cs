@@ -1,4 +1,6 @@
-﻿using AWBWApp.Game.API.Replay.Actions;
+﻿using System;
+using AWBWApp.Game.API.Replay.Actions;
+using AWBWApp.Game.Game.Logic;
 
 namespace AWBWApp.Game.API.Replay
 {
@@ -11,6 +13,61 @@ namespace AWBWApp.Game.API.Replay
         public static void ProcessReplay(ReplayData replay)
         {
             fixTagEndOfTurns(replay);
+            resolveTimedWeather(replay);
+        }
+
+        /// <summary>
+        /// Names the weather on every turn that reported a countdown instead of a type.
+        /// </summary>
+        /// <remarks>
+        /// While a weather a CO power started is running, AWBW reports it as the number of days
+        /// it has left rather than as "S" or "R". That says how long but not what, so the type has
+        /// to come from the power that started it — which does state it, in the name beside its
+        /// own code. Walking the replay in order and carrying the weather forward resolves every
+        /// countdown, and the replay states each step, so nothing here is simulated.
+        /// </remarks>
+        private static void resolveTimedWeather(ReplayData replay)
+        {
+            WeatherType? currentWeather = null;
+
+            foreach (var turn in replay.TurnData)
+            {
+                if (turn.StartWeather != null)
+                {
+                    if (turn.StartWeather.DaysRemaining.HasValue)
+                        turn.StartWeather.Type = weatherInEffect(currentWeather, turn);
+                    else
+                        currentWeather = turn.StartWeather.Type;
+                }
+
+                if (turn.Actions == null)
+                    continue;
+
+                foreach (var action in turn.Actions)
+                {
+                    switch (action)
+                    {
+                        case PowerAction power when power.ChangeToWeather.HasValue:
+                            currentWeather = power.ChangeToWeather.Value;
+                            break;
+
+                        case EndTurnAction endTurn:
+                            if (endTurn.NextWeatherDaysRemaining.HasValue)
+                                endTurn.NextWeatherType = weatherInEffect(currentWeather, turn);
+                            else
+                                currentWeather = endTurn.NextWeatherType;
+                            break;
+                    }
+                }
+            }
+        }
+
+        private static WeatherType weatherInEffect(WeatherType? currentWeather, TurnData turn)
+        {
+            if (currentWeather == null)
+                throw new Exception($"Day {turn.Day} reports a weather still running, but no power before it set any weather.");
+
+            return currentWeather.Value;
         }
 
         /// <summary>

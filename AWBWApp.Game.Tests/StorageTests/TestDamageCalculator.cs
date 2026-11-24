@@ -21,6 +21,7 @@ namespace AWBWApp.Game.Tests.StorageTests
     {
         private DamageChartStorage charts;
         private UnitStorage units;
+        private COStorage cos;
         private DamageCalculator calculator;
 
         [SetUp]
@@ -35,6 +36,11 @@ namespace AWBWApp.Game.Tests.StorageTests
                 charts.LoadStream(stream);
             using (var stream = dllStore.GetStream("Json/Units.json"))
                 units.LoadStream(stream);
+
+            cos = new COStorage();
+
+            using (var stream = dllStore.GetStream("Json/COs.json"))
+                cos.LoadStream(stream);
 
             calculator = new DamageCalculator(charts);
         }
@@ -235,13 +241,20 @@ namespace AWBWApp.Game.Tests.StorageTests
         public void OnlySonjaCountersHarderThanSheAttacks()
         {
             var sonjaAttacking = calculator.Calculate(situation("Tank", "Tank", attackerCO: "Sonja", defenderCO: "Andy"));
-            var sonjaCountering = calculator.Calculate(situation("Tank", "Tank", attackerCO: "Sonja", defenderCO: "Sonja", counter: true));
+            var sonjaCountering = calculator.Calculate(situation("Tank", "Tank", attackerCO: "Sonja", defenderCO: "Andy", counter: true));
             var andyCountering = calculator.Calculate(situation("Tank", "Tank", counter: true));
             var andyAttacking = calculator.Calculate(situation("Tank", "Tank"));
 
-            //The multiplier belongs to the CO being attacked, not the one swinging.
+            //A counter situation is the fight reversed, so the multiplier belongs to whoever is
+            //swinging in it - the unit that was attacked and is hitting back.
             Assert.That(sonjaCountering.AverageDamage, Is.GreaterThan(sonjaAttacking.AverageDamage));
             Assert.That(andyCountering.AverageDamage, Is.EqualTo(andyAttacking.AverageDamage));
+
+            //Sonja being attacked does not make her attacker's counter any harder.
+            var againstSonja = calculator.Calculate(situation("Tank", "Tank", attackerCO: "Andy", defenderCO: "Sonja", counter: true));
+
+            Assert.That(againstSonja.AverageDamage, Is.EqualTo(andyCountering.AverageDamage),
+                "Sonja's bonus was read off the wrong side of the fight.");
         }
 
         /// <summary>
@@ -377,6 +390,149 @@ namespace AWBWApp.Game.Tests.StorageTests
             }
         }
 
+        /// <summary>
+        /// Bad luck can be worth more than a weak attack is, and an attack that goes that badly
+        /// does nothing rather than healing what it hit.
+        /// </summary>
+        [Test]
+        public void TheWorstLuckNeverHealsTheDefender()
+        {
+            //Infantry into a Neotank is about as little damage as the charts hold, and Sonja
+            //rolls down to -9 on top of it.
+            var result = calculator.Calculate(situation("Infantry", "Neotank", attackerCO: "Sonja", stars: 4));
+
+            Assert.That(result.CanAttack, Is.True);
+            Assert.That(result.Outcomes.Select(x => x.Damage), Has.All.GreaterThanOrEqualTo(0));
+            Assert.That(result.Outcomes.Select(x => x.Damage), Has.Some.EqualTo(0), "The worst rolls here should come to nothing at all.");
+        }
+
+        /// <summary>
+        /// Jugger's super rolls down to -44, far past what most attacks deal.
+        /// </summary>
+        [Test]
+        public void JuggersSuperNeverHealsTheDefender()
+        {
+            var result = calculator.Calculate(situation("Infantry", "Neotank", attackerCO: "Jugger", attackerPower: ActiveCOPower.Super, stars: 4));
+
+            Assert.That(result.Outcomes.Select(x => x.Damage), Has.All.GreaterThanOrEqualTo(0));
+        }
+
+        /// <summary>
+        /// A variant only carries rows where its numbers differ, so one with none at all has to
+        /// behave exactly like the CO it stands in for.
+        /// </summary>
+        [Test]
+        public void AVariantWithNoRowsOfItsOwnFightsLikeItsBase()
+        {
+            var asKanbei = calculator.Calculate(situation("Tank", "Tank", attackerCO: "Kanbei", defenderCO: "Kanbei"));
+
+            var asVariant = situation("Tank", "Tank", attackerCO: "Pretend Kanbei", defenderCO: "Pretend Kanbei");
+            asVariant.Attacker.BaseCO = "Kanbei";
+            asVariant.Defender.BaseCO = "Kanbei";
+
+            Assert.That(calculator.Calculate(asVariant).Outcomes.Select(x => x.Damage),
+                Is.EqualTo(asKanbei.Outcomes.Select(x => x.Damage)));
+        }
+
+        /// <summary>
+        /// A counterattack bonus comes from the CO's own entry, so a variant gets whatever its
+        /// data says rather than whatever its base happens to do.
+        /// </summary>
+        [Test]
+        public void AVariantCountersWithItsOwnMultiplier()
+        {
+            //2.0x where Kanbei's own super gives 1.5x.
+            Assert.That(counterMultiplierFor("DS Kanbei"), Is.GreaterThan(counterMultiplierFor("Kanbei")));
+        }
+
+        /// <summary>
+        /// Kanbei's super makes his units hit back harder, which went unapplied for as long as the
+        /// calculator knew only about Sonja.
+        /// </summary>
+        [Test]
+        public void KanbeisSuperStrengthensHisCounters()
+        {
+            Assert.That(counterMultiplierFor("Kanbei"), Is.GreaterThan(1));
+            Assert.That(counterMultiplierFor("Andy"), Is.EqualTo(1).Within(0.001));
+        }
+
+        /// <summary>
+        /// What a counterattack is worth against what the same attack does outright, which is the
+        /// multiplier and nothing else: every other term is held still.
+        /// </summary>
+        private double counterMultiplierFor(string co)
+        {
+            var countering = calculator.Calculate(situation("Tank", "Tank", attackerCO: co, defenderCO: "Andy",
+                counter: true, attackerPower: ActiveCOPower.Super));
+
+            var outright = calculator.Calculate(situation("Tank", "Tank", attackerCO: co, defenderCO: "Andy",
+                attackerPower: ActiveCOPower.Super));
+
+            return countering.AverageDamage / outright.AverageDamage;
+        }
+
+        /// <summary>
+        /// The rules that still single a CO out by name mean the variant too.
+        /// </summary>
+        [Test]
+        public void AVariantIsStillRecognisedByName()
+        {
+            var variant = situation("Tank", "Tank", attackerCO: "Pretend Colin",
+                attackerPower: ActiveCOPower.Super, funds: 50000);
+            variant.Attacker.BaseCO = "Colin";
+
+            var colin = situation("Tank", "Tank", attackerCO: "Colin",
+                attackerPower: ActiveCOPower.Super, funds: 50000);
+
+            Assert.That(calculator.Calculate(variant).AverageDamage,
+                Is.EqualTo(calculator.Calculate(colin).AverageDamage),
+                "Power of Money should follow a variant of Colin.");
+        }
+
+        /// <summary>
+        /// Luck falls back too, which is what keeps a variant of Sonja rolling her weighted dice
+        /// rather than a flat 0 to 9.
+        /// </summary>
+        [Test]
+        public void AVariantInheritsItsBasesLuck()
+        {
+            var variant = situation("Tank", "Tank", attackerCO: "Pretend Sonja");
+            variant.Attacker.BaseCO = "Sonja";
+
+            var spread = calculator.Calculate(variant).Outcomes.Count;
+
+            Assert.That(spread, Is.EqualTo(calculator.Calculate(situation("Tank", "Tank", attackerCO: "Sonja")).Outcomes.Count));
+            Assert.That(spread, Is.Not.EqualTo(calculator.Calculate(situation("Tank", "Tank", attackerCO: "Andy")).Outcomes.Count));
+        }
+
+        /// <summary>
+        /// The hand-maintained rows are the ones a regeneration would wipe, so the list naming
+        /// them has to stay true to what is actually in the file.
+        /// </summary>
+        [Test]
+        public void EveryHandMaintainedRowIsNamedAndPresent()
+        {
+            Assert.That(charts.HandMaintainedCORows, Is.Not.Empty);
+
+            foreach (var row in charts.HandMaintainedCORows)
+                Assert.That(charts.HasCORow(row), Is.True, $"{row} is listed as hand-maintained but has no row.");
+
+            var coStorage = new COStorage();
+
+            using (var stream = new DllResourceStore(typeof(AWBWAppResources).Assembly).GetStream("Json/COs.json"))
+                coStorage.LoadStream(stream);
+
+            //A variant's rows can only have been written by hand, so any that exist must be listed.
+            foreach (var co in coStorage.GetAllCOs().Where(x => x.IsVariant))
+            {
+                foreach (var state in new[] { co.Name, co.Name + "-COP", co.Name + "-SCOP" })
+                {
+                    if (charts.HasCORow(state))
+                        Assert.That(charts.HandMaintainedCORows, Does.Contain(state), $"{state} is a variant row but is not listed as hand-maintained.");
+                }
+            }
+        }
+
         private (int, int) luckBounds(string coState)
         {
             var rolls = charts.GetLuckRolls(coState).Keys.Select(int.Parse).ToList();
@@ -386,7 +542,8 @@ namespace AWBWApp.Game.Tests.StorageTests
         private AttackSituation situation(string attacker, string defender, int ammo = 9, string attackerCO = "Andy",
                                           string defenderCO = "Andy", ActiveCOPower attackerPower = ActiveCOPower.None,
                                           string attackerTerrain = null, int stars = 0, int defenderHitPoints = 10,
-                                          int funds = 0, int cities = 0, bool counter = false) =>
+                                          int funds = 0, int cities = 0, bool counter = false,
+                                          ActiveCOPower defenderPower = ActiveCOPower.None) =>
             new AttackSituation
             {
                 Attacker = new CombatantState
@@ -396,6 +553,7 @@ namespace AWBWApp.Game.Tests.StorageTests
                     Ammo = ammo,
                     CO = attackerCO,
                     Power = attackerPower,
+                    CounterAttackPower = counterAttackPower(attackerCO, attackerPower),
                     Funds = funds,
                     Cities = cities,
                     Terrain = attackerTerrain
@@ -406,9 +564,18 @@ namespace AWBWApp.Game.Tests.StorageTests
                     HitPoints = defenderHitPoints,
                     Ammo = 9,
                     CO = defenderCO,
+                    Power = defenderPower,
+                    CounterAttackPower = counterAttackPower(defenderCO, defenderPower),
                     TerrainStars = stars
                 },
                 IsCounterAttack = counter
             };
+
+        /// <summary>
+        /// Taken from the CO data, as the game does, so these tests cover the values in COs.json
+        /// rather than a copy of them.
+        /// </summary>
+        private double counterAttackPower(string coName, ActiveCOPower power)
+            => cos.TryGetCOByName(coName, out var co) ? co.GetCounterAttackPower(power) : 1;
     }
 }

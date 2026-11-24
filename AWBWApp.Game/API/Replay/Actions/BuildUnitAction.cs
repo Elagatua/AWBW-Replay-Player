@@ -60,7 +60,7 @@ namespace AWBWApp.Game.API.Replay.Actions
             var activePlayer = context.PlayerTurns[context.ActivePlayerID];
 
             context.Units.Add(NewUnit.ID, NewUnit.Clone());
-            var dayToDay = controller.COStorage.GetCOByAWBWId(activePlayer.ActiveCOID).DayToDayPower;
+            var dayToDay = controller.COStorage.GetCOPlayedBy(activePlayer).DayToDayPower;
             var currentPower = controller.GetActivePowerForPlayer(NewUnit.PlayerID!.Value);
 
             unitCost = ReplayActionHelper.CalculateUnitCost(NewUnit, dayToDay, currentPower?.COPower);

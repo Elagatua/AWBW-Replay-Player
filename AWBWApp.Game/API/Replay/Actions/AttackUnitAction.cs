@@ -206,7 +206,7 @@ namespace AWBWApp.Game.API.Replay.Actions
 
             originalAttacker = attacker.Clone();
             originalUnits.Add(originalAttacker.ID, originalAttacker);
-            var attackerCO = controller.COStorage.GetCOByAWBWId(context.PlayerTurns[attacker.PlayerID!.Value].ActiveCOID);
+            var attackerCO = controller.COStorage.GetCOPlayedBy(context.PlayerTurns[attacker.PlayerID!.Value]);
 
             if (Attacker.HitPoints!.Value > 0)
             {
@@ -232,7 +232,7 @@ namespace AWBWApp.Game.API.Replay.Actions
 
             originalDefender = defender.Clone();
             originalUnits.Add(originalDefender.ID, originalDefender);
-            var defenderCO = controller.COStorage.GetCOByAWBWId(context.PlayerTurns[defender.PlayerID!.Value].ActiveCOID);
+            var defenderCO = controller.COStorage.GetCOPlayedBy(context.PlayerTurns[defender.PlayerID!.Value]);
 
             if (Defender.HitPoints!.Value > 0)
             {

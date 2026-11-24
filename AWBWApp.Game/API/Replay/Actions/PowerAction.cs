@@ -340,7 +340,15 @@ namespace AWBWApp.Game.API.Replay.Actions
             var weatherChange = (JObject)jObject["weather"];
 
             if (weatherChange != null)
-                action.ChangeToWeather = WeatherHelper.ParseWeatherCode((string)weatherChange["weatherCode"]);
+            {
+                //The code is the number of days the weather will run for once a CO power sets it,
+                //so read the name beside it, which always says what the weather actually is.
+                var weatherName = (string)weatherChange["weatherName"];
+
+                action.ChangeToWeather = weatherName != null
+                    ? WeatherHelper.ParseWeatherName(weatherName)
+                    : WeatherHelper.ParseWeatherCode((string)weatherChange["weatherCode"]);
+            }
 
             return action;
         }

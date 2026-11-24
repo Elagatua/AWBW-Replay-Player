@@ -231,7 +231,7 @@ namespace AWBWApp.Game.Game.Logic
         {
             var playerCountry = PlayerInfos[playerID].CountryID;
 
-            var perBuilding = fundsPerBuilding + coStorage.GetCOByAWBWId(PlayerTurns[playerID].ActiveCOID).DayToDayPower.PropertyFundIncrease;
+            var perBuilding = fundsPerBuilding + coStorage.GetCOPlayedBy(PlayerTurns[playerID]).DayToDayPower.PropertyFundIncrease;
 
             var funds = 0;
 
@@ -257,7 +257,7 @@ namespace AWBWApp.Game.Game.Logic
             if (!deletedUnits.ContainsKey(unitID))
                 deletedUnits.Add(unitID, unitToRemove.Clone());
 
-            value = ReplayActionHelper.CalculateUnitCost(unitToRemove, coStorage.GetCOByAWBWId(PlayerTurns[unitToRemove.PlayerID!.Value].ActiveCOID).DayToDayPower, null);
+            value = ReplayActionHelper.CalculateUnitCost(unitToRemove, coStorage.GetCOPlayedBy(PlayerTurns[unitToRemove.PlayerID!.Value]).DayToDayPower, null);
 
             if (unitToRemove.CargoUnits != null && unitToRemove.CargoUnits.Count > 0)
             {
@@ -278,11 +278,11 @@ namespace AWBWApp.Game.Game.Logic
                 if (unit.PlayerID != player1 && unit.PlayerID != player2)
                     continue;
 
-                var value = ReplayActionHelper.CalculateUnitCost(unit, coStorage.GetCOByAWBWId(PlayerTurns[unit.PlayerID!.Value].ActiveCOID).DayToDayPower, null);
+                var value = ReplayActionHelper.CalculateUnitCost(unit, coStorage.GetCOPlayedBy(PlayerTurns[unit.PlayerID!.Value]).DayToDayPower, null);
 
                 bool unitAlive = Units.TryGetValue(unit.ID, out var changedUnit);
                 if (unitAlive)
-                    value -= ReplayActionHelper.CalculateUnitCost(changedUnit, coStorage.GetCOByAWBWId(PlayerTurns[changedUnit.PlayerID!.Value].ActiveCOID).DayToDayPower, null);
+                    value -= ReplayActionHelper.CalculateUnitCost(changedUnit, coStorage.GetCOPlayedBy(PlayerTurns[changedUnit.PlayerID!.Value]).DayToDayPower, null);
 
                 //Don't care if the unit change doesn't affect value. In repairing/resupplying units.
                 if (value <= 0)
@@ -305,11 +305,11 @@ namespace AWBWApp.Game.Game.Logic
         {
             foreach (var unit in units)
             {
-                var value = ReplayActionHelper.CalculateUnitCost(unit, coStorage.GetCOByAWBWId(PlayerTurns[unit.PlayerID!.Value].ActiveCOID).DayToDayPower, null);
+                var value = ReplayActionHelper.CalculateUnitCost(unit, coStorage.GetCOPlayedBy(PlayerTurns[unit.PlayerID!.Value]).DayToDayPower, null);
 
                 bool unitAlive = Units.TryGetValue(unit.ID, out var changedUnit);
                 if (unitAlive)
-                    value -= ReplayActionHelper.CalculateUnitCost(changedUnit, coStorage.GetCOByAWBWId(PlayerTurns[changedUnit.PlayerID!.Value].ActiveCOID).DayToDayPower, null);
+                    value -= ReplayActionHelper.CalculateUnitCost(changedUnit, coStorage.GetCOPlayedBy(PlayerTurns[changedUnit.PlayerID!.Value]).DayToDayPower, null);
 
                 //Don't care if the unit change doesn't affect value. In repairing/resupplying units.
                 if (value <= 0)

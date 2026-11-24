@@ -47,16 +47,30 @@ namespace AWBWApp.Game.UI.Components
 
         private readonly int smallBars;
 
+        private readonly bool coHasNormalPower;
+        private readonly bool coHasSuperPower;
+
         public override bool HandlePositionalInput => true;
 
         public PowerProgress(int? requiredNormal, int? requiredSuper)
         {
+            //AWBW marks a power the CO does not have with a negative requirement. The parser
+            //already maps that onto null, but a negative here would silently lay the meter out
+            //backwards, so do not trust the caller.
+            if (requiredNormal < 0)
+                requiredNormal = null;
+            if (requiredSuper < 0)
+                requiredSuper = null;
+
             if (!requiredNormal.HasValue && !requiredSuper.HasValue)
                 throw new Exception("RequiredPowers cannot both be null.");
 
-            //AWBW actually makes both powers the same.
+            //AWBW marks a CO with no normal power, such as Von Bolt, by making both powers the same.
             if (requiredNormal == requiredSuper)
                 requiredNormal = null;
+
+            coHasNormalPower = requiredNormal.HasValue;
+            coHasSuperPower = requiredSuper.HasValue;
 
             smallBars = requiredNormal.HasValue ? requiredNormal.Value / ProgressPerBar : 0;
             var largeBars = requiredSuper.HasValue ? (requiredSuper.Value / ProgressPerBar) - smallBars : 0;
@@ -91,7 +105,21 @@ namespace AWBWApp.Game.UI.Components
             Current.BindValueChanged(val => TransformPower(DisplayedValue, val.NewValue));
         }
 
-        public LocalisableString TooltipText => $"Normal: {Math.Floor(Math.Min(displayedPower, PowerRequiredForNormal) / 10.0f)} / {Math.Floor(PowerRequiredForNormal / 10.0f)}\nSuper:    {Math.Floor(Math.Min(displayedPower, PowerRequiredForSuper) / 10.0f)} / {Math.Floor(PowerRequiredForSuper / 10.0f)}";
+        public LocalisableString TooltipText
+        {
+            get
+            {
+                var lines = new List<string>();
+
+                if (coHasNormalPower)
+                    lines.Add($"Normal: {Math.Floor(Math.Min(displayedPower, PowerRequiredForNormal) / 10.0f)} / {Math.Floor(PowerRequiredForNormal / 10.0f)}");
+
+                if (coHasSuperPower)
+                    lines.Add($"Super:    {Math.Floor(Math.Min(displayedPower, PowerRequiredForSuper) / 10.0f)} / {Math.Floor(PowerRequiredForSuper / 10.0f)}");
+
+                return string.Join('\n', lines);
+            }
+        }
 
         public void UpdatePower()
         {

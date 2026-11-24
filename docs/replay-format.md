@@ -211,6 +211,65 @@ property a given team believes is there.
 A non-empty JSON **array** for `discovered` throws (`Non-Empty Array for
 Discovery`); empty array and `null` are both accepted as "nothing".
 
+## CO power meters
+
+`co_power` is how much a player has charged; `co_max_power` and `co_max_spower`
+are what the normal and super powers cost. Using *either* power raises *both*
+requirements, each by `18000 ×` its own star count, which is why they drift
+upwards through a replay.
+
+A CO that **does not have one of the two powers** is marked two different ways,
+and neither is an absence:
+
+| Missing power | How AWBW says it | Example |
+|---|---|---|
+| Super | **negative** `co_max_spower` | Clone Andy `270000 / -540000` |
+| Normal | `co_max_power` **equal to** `co_max_spower` | Von Bolt |
+
+The first is confirmed against replays; the second is what `ReplayPlayerListItem`
+has long assumed and is recorded here because the code depends on it, not because
+it was re-checked.
+
+The negative keeps escalating in magnitude with the CO's original star count
+(`-540000 → -648000 → …`), so only the sign carries meaning. `readPowerRequirement`
+maps it onto `null`; see [data-files.md](data-files.md#co-variants) for why this
+is the one thing that identifies a tournament variant.
+
+## Weather
+
+`weather_type` is the game's **setting** and never changes. The current weather
+is `weather_code`, and it has two forms:
+
+| Form | Meaning |
+|---|---|
+| `C` / `R` / `S` | Clear, rain or snow |
+| a number | A weather a CO power started, with that many days left to run |
+
+The number says *how long*, not *what*, so it cannot be turned into a weather on
+its own. `weather_start` is a separate field holding the id of the player whose
+power caused the current weather; it is set for **both** forms and null only when
+nothing caused it. A `Power` action naming the weather it sets carries both —
+`{"weatherCode": "2", "weatherName": "Snow"}` — and the name is the half worth
+reading.
+
+Which form AWBW picks is not understood. In the replays to hand, a weather
+lasting one turn is reported as a letter and a multi-day one as a countdown, but
+that is two samples, not a rule.
+
+`ReplayPostProcessor` resolves the countdowns by walking the replay in order and
+carrying the last weather a power set forwards. A countdown with no power before
+it throws, rather than guessing.
+
+Worked example, from a DS Olaf game:
+
+```
+day12/olaf = C   <- Winter Fury lands during this turn
+day12/sonja = 2
+day13/olaf  = 1
+day13/sonja = 1
+day14/olaf  = C
+```
+
 ## Hit points in the data
 
 The single most surprising property of the format:

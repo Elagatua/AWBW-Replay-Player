@@ -325,10 +325,10 @@ namespace AWBWApp.Game.UI.Replay
 
             //Only Kindle's super counts cities, and only Colin's cares what is in the bank. Showing
             //either for anyone else would suggest it changes a number that it does not.
-            if (state.CO == "Kindle")
+            if (state.IsCO("Kindle"))
                 chips.Add(createChip("UI/BuildingsCaptured", state.Cities.ToString(CultureInfo.InvariantCulture)));
 
-            if (state.CO == "Colin")
+            if (state.IsCO("Colin"))
                 chips.Add(createChip("UI/Coin", FormatFunds(state.Funds)));
         }
 

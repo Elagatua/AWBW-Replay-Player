@@ -24,6 +24,22 @@ namespace AWBWApp.Game.Game.Damage
         /// <summary>The CO's name, or null where there is none.</summary>
         public string CO { get; set; }
 
+        /// <summary>
+        /// The CO this one stands in for, where it is a tournament variant, and null otherwise.
+        /// </summary>
+        /// <remarks>
+        /// A variant is a different CO with its own numbers, but it is still recognisably the one
+        /// it reworks, and the rules that single COs out by name mean it too: DS Sonja counters
+        /// like Sonja. It also decides what the charts fall back to, so a variant only needs rows
+        /// where it actually differs.
+        /// </remarks>
+        public string BaseCO { get; set; }
+
+        /// <summary>
+        /// Whether this is the named CO, counting a variant as the CO it stands in for.
+        /// </summary>
+        public bool IsCO(string name) => CO == name || BaseCO == name;
+
         public ActiveCOPower Power { get; set; }
 
         /// <summary>Com towers held. Each is worth +10% attack, and nothing to defence.</summary>
@@ -45,27 +61,43 @@ namespace AWBWApp.Game.Game.Damage
         public int TerrainStars { get; set; }
 
         /// <summary>
+        /// How much harder this unit hits back when it is the one being attacked. 1 for almost
+        /// everyone; Sonja counters at 1.5, Kanbei at 1.5 under his super, DS Kanbei at 2.
+        /// </summary>
+        /// <remarks>
+        /// Read from the CO rather than the charts, because the spreadsheet models no
+        /// counterattacks at all. See <c>docs/damage.md</c>.
+        /// </remarks>
+        public double CounterAttackPower { get; set; } = 1;
+
+        /// <summary>
         /// The key the charts file this CO under. Every CO has three rows, one per power state,
         /// and each power row already carries the universal +10% that any active power grants.
         /// </summary>
-        public string COState
+        public string COState => stateFor(CO);
+
+        /// <summary>
+        /// The row to read when this CO has none of its own. A variant that does not differ from
+        /// the CO it stands in for needs no rows at all; one that differs needs only the states it
+        /// differs in.
+        /// </summary>
+        public string BaseCOState => stateFor(BaseCO);
+
+        private string stateFor(string co)
         {
-            get
+            if (string.IsNullOrEmpty(co))
+                return null;
+
+            switch (Power)
             {
-                if (string.IsNullOrEmpty(CO))
-                    return null;
+                case ActiveCOPower.Normal:
+                    return co + "-COP";
 
-                switch (Power)
-                {
-                    case ActiveCOPower.Normal:
-                        return CO + "-COP";
+                case ActiveCOPower.Super:
+                    return co + "-SCOP";
 
-                    case ActiveCOPower.Super:
-                        return CO + "-SCOP";
-
-                    default:
-                        return CO;
-                }
+                default:
+                    return co;
             }
         }
 
@@ -77,12 +109,14 @@ namespace AWBWApp.Game.Game.Damage
                 HitPoints = hitPoints,
                 Ammo = Ammo,
                 CO = CO,
+                BaseCO = BaseCO,
                 Power = Power,
                 ComTowers = ComTowers,
                 Cities = Cities,
                 Funds = Funds,
                 Terrain = Terrain,
-                TerrainStars = TerrainStars
+                TerrainStars = TerrainStars,
+                CounterAttackPower = CounterAttackPower
             };
         }
     }

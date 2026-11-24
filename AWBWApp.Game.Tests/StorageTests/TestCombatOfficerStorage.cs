@@ -24,10 +24,8 @@ namespace AWBWApp.Game.Tests.StorageTests
             using (var stream = dllStore.GetStream("Json/Units.json"))
                 unitStorage.LoadStream(stream);
 
-            foreach (var coID in coStorage.GetAllCOIDs())
+            foreach (var co in coStorage.GetAllCOs())
             {
-                var co = coStorage.GetCOByAWBWId(coID);
-
                 checkPowerIncreases(co.DayToDayPower?.PowerIncreases, unitStorage, co.Name);
                 checkPowerIncreases(co.NormalPower?.PowerIncreases, unitStorage, co.Name);
                 checkPowerIncreases(co.SuperPower?.PowerIncreases, unitStorage, co.Name);

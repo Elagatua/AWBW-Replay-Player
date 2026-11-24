@@ -11,9 +11,51 @@ namespace AWBWApp.Game.Game.COs
         public int AWBWID { get; set; }
         public string Tooltip;
 
+        /// <summary>
+        /// Names the CO this one stands in for, or null for the COs AWBW plays by default.
+        /// </summary>
+        /// <remarks>
+        /// Tournaments can rework a CO without giving it an id of its own: the Mini Amarriner
+        /// Cup's "DS Olaf" is still co_id 9 in the replay, and replaces Olaf for the games it is
+        /// played in. A variant therefore shares its base's <see cref="AWBWID"/>, and a replay on
+        /// its own usually cannot say which of the two was played — see <see cref="COStorage"/>.
+        /// </remarks>
+        public string VariantOf { get; set; }
+
+        /// <summary>
+        /// Whether this CO stands in for another rather than being one AWBW plays by default.
+        /// </summary>
+        public bool IsVariant => VariantOf != null;
+
         public COPower DayToDayPower;
         public COPower NormalPower;
         public COPower SuperPower;
+
+        public COPower GetPower(ActiveCOPower power)
+        {
+            switch (power)
+            {
+                case ActiveCOPower.Normal:
+                    return NormalPower;
+
+                case ActiveCOPower.Super:
+                    return SuperPower;
+
+                default:
+                    return null;
+            }
+        }
+
+        /// <summary>
+        /// How much harder this CO's units hit back, with whatever power is running.
+        /// </summary>
+        /// <remarks>
+        /// Sonja's is day-to-day and Kanbei's comes with his super, so the two are multiplied
+        /// rather than one overriding the other. No CO has both, which makes that identity today,
+        /// but it is the reading that stays sensible if one ever does.
+        /// </remarks>
+        public double GetCounterAttackPower(ActiveCOPower power)
+            => (DayToDayPower?.CounterAttackPower ?? 1) * (GetPower(power)?.CounterAttackPower ?? 1);
     }
 
     public class COPower

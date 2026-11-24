@@ -369,12 +369,18 @@ namespace AWBWApp.Game.Game.Damage
             if (!tryGetTerrain(context, position.Value, out var stars, out var terrainName))
                 return null;
 
+            //The CO as played, variant and all. The charts fall back to the CO a variant stands
+            //in for, so a variant with no rows of its own behaves exactly as it used to.
+            var playedCO = coStorage.GetCOPlayedBy(turn);
+
             return new CombatantState
             {
                 Unit = unitData,
                 HitPoints = displayedHitPoints(unit),
                 Ammo = unit.Ammo ?? unitData.MaxAmmo,
-                CO = coStorage.GetCOByAWBWId(turn.ActiveCOID)?.Name,
+                CO = playedCO?.Name,
+                BaseCO = playedCO?.VariantOf,
+                CounterAttackPower = playedCO?.GetCounterAttackPower(turn.COPowerOn) ?? 1,
                 Power = turn.COPowerOn,
                 ComTowers = countBuildings(context, unit.PlayerID.Value, "ComTower"),
                 Cities = countBuildings(context, unit.PlayerID.Value, "City"),

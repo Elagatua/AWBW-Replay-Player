@@ -733,5 +733,253 @@
             "PowerStars": 10
             //Additional Effect: Fire Missile dealing 3 damage and stunning enemies caught in it
         }
+    },
+
+    /*
+     * Tournament variants.
+     *
+     * These stand in for a CO rather than being one AWBW plays by default, so each shares its
+     * base's AWBWID and names it in "VariantOf". The ones below come from the 2026 Mini Amarriner
+     * Cup, which replaces a CO with its AW1 self for the rounds they are played in.
+     *
+     * An AW1 CO has no super power. That is the one difference a replay reports, through a
+     * negative co_max_spower, so these five are the variants this program can recognise on its
+     * own. Power names are the ones the action stream uses, which are not always the ones the
+     * tournament's own chart prints.
+     */
+
+    "Clone Andy": {
+        "Name": "Clone Andy",
+        "AWBWID": 1,
+        "VariantOf": "Andy",
+        "ToolTip": "Clone Andy: No day-to-day abilities.",
+        "DayToDayPower": {},
+        "NormalPower": {
+            "PowerStars": 3
+            //Additional Effects: Heal all units by 2hp
+        }
+    },
+    "AW1 Max": {
+        "Name": "AW1 Max",
+        "AWBWID": 7,
+        "VariantOf": "Max",
+        "ToolTip": "AW1 Max: Direct units (except footsoldiers) gain +50% attack. Indirect units lose 10% attack, 10% defense and 1 range.",
+        "DayToDayPower": {
+            "PowerIncreases": [
+                {
+                    "AffectedUnits": [ "Anti-Air", "B-Copter", "Bomber", "Cruiser", "Fighter", "Md.Tank", "Mega Tank", "Neotank", "Recon", "Stealth", "Sub", "Tank"],
+                    "PowerIncrease": 0.5
+                },
+                {
+                    "AffectedUnits": [ "Artillery", "Battleship", "Carrier", "Missile", "Piperunner" ],
+                    "PowerIncrease": -0.1,
+                    "DefenseIncrease": -0.1,
+                    "RangeIncrease": -1
+                }
+            ]
+        },
+        "NormalPower": {
+            "PowerStars": 3,
+            "PowerIncreases": [
+                {
+                    "AffectedUnits": [ "Anti-Air", "B-Copter", "Bomber", "Cruiser", "Fighter", "Md.Tank", "Mega Tank", "Neotank", "Recon", "Stealth", "Sub", "Tank"],
+                    "PowerIncrease": 0.27
+                }
+                //Additional Effects: Directs get +1 Movement
+            ]
+        }
+    },
+    "AW1 Olaf": {
+        "Name": "AW1 Olaf",
+        "AWBWID": 9,
+        "VariantOf": "Olaf",
+        "ToolTip": "AW1 Olaf: Units unaffected by Snow, but rain affects units like snow.",
+        "DayToDayPower": {
+            "WeatherWithNoMovementAffect": "Snow",
+            "WeatherWithAdditionalMovementAffect": "Rain"
+        },
+        "NormalPower": {
+            "PowerStars": 3
+            //Additional Effects: Changes the weather to snow for 1 day.
+        }
+    },
+    "AW1 Drake": {
+        "Name": "AW1 Drake",
+        "AWBWID": 5,
+        "VariantOf": "Drake",
+        "ToolTip": "AW1 Drake: Naval units gain +1 movement and +2 terrain stars. Air units lose -20% attack. All units unaffected by rain (excluding sight). Higher chance of rain during random weather.",
+        "DayToDayPower": {
+            "WeatherWithNoMovementAffect": "Rain",
+            //Todo: Higher Rain chance in random weather
+            //Additional effect: Naval units get +1 Movement and +2 terrain stars, which this
+            //program has no way to describe. Drake's own entry calls the same idea +25% defence.
+            "PowerIncreases": [
+                {
+                    "AffectedUnits": [ "B-Copter", "Bomber", "Fighter", "Stealth", "T-Copter" ],
+                    "PowerIncrease": -0.2
+                }
+            ]
+        },
+        "NormalPower": {
+            "PowerStars": 4
+            //Additional effect: Damage all units for 1 hp. Unlike Drake's Tsunami, fuel is untouched.
+        }
+    },
+    "AW1C Sturm": {
+        "Name": "AW1C Sturm",
+        "AWBWID": 29,
+        "VariantOf": "Sturm",
+        "ToolTip": "AW1C Sturm: Movement cost over all terrain is reduced to 1, except during snow. Units gain +30% attack but lose -20% defense.",
+        "DayToDayPower": {
+            "MoveCostPerTile": 1,
+            "PowerIncreases": [
+                {
+                    "AffectedUnits": [ "all" ],
+                    "PowerIncrease": 0.3,
+                    "DefenseIncrease": -0.2
+                }
+            ]
+        },
+        "NormalPower": {
+            "PowerStars": 6,
+            "PowerIncreases": [
+                {
+                    "AffectedUnits": [ "all" ],
+                    "PowerIncrease": 0.1
+                }
+            ]
+            //Additional Effect: Fire a 2 range missile dealing 8 damage, aimed at the greatest
+            //accumulation of unit value.
+        }
+    },
+
+    /*
+     * The DS reworks keep both of their powers, and their star costs, so nothing in a replay
+     * tells them apart from the CO they stand in for. They are only ever chosen by hand.
+     */
+
+    "DS Jess": {
+        "Name": "DS Jess",
+        "AWBWID": 14,
+        "VariantOf": "Jess",
+        "ToolTip": "DS Jess: Vehicles gain +20% attack, but all other units except footsoldiers lose -10% attack.",
+        "DayToDayPower": {
+            "PowerIncreases": [
+                {
+                    "AffectedUnits": [ "Anti-Air", "APC", "Artillery", "Md.Tank", "Mega Tank", "Missile", "Neotank", "Piperunner", "Recon", "Rocket", "Tank" ],
+                    "PowerIncrease": 0.2
+                },
+                {
+                    "AffectedUnits": [ "B-Copter", "Battleship", "Black Boat", "Black Bomb", "Bomber", "Carrier", "Cruiser", "Fighter", "Lander", "Stealth", "Sub", "T-Copter" ],
+                    "PowerIncrease": -0.1
+                }
+            ]
+        },
+        "NormalPower": {
+            "PowerStars": 3,
+            "PowerIncreases": [
+                {
+                    "AffectedUnits": [ "Anti-Air", "APC", "Artillery", "Md.Tank", "Mega Tank", "Missile", "Neotank", "Piperunner", "Recon", "Rocket", "Tank" ],
+                    "PowerIncrease": 0.4
+                }
+                //Additional Effects: Vehicles get +1 Movement. All units resupply fuel and ammo.
+            ]
+        },
+        "SuperPower": {
+            "PowerStars": 6,
+            "PowerIncreases": [
+                {
+                    "AffectedUnits": [ "Anti-Air", "APC", "Artillery", "Md.Tank", "Mega Tank", "Missile", "Neotank", "Piperunner", "Recon", "Rocket", "Tank" ],
+                    "PowerIncrease": 0.6
+                }
+                //Additional Effects: Vehicles get +2 Movement. All units resupply fuel and ammo.
+            ]
+        }
+    },
+    "DS Kanbei": {
+        "Name": "DS Kanbei",
+        "AWBWID": 3,
+        "VariantOf": "Kanbei",
+        "ToolTip": "DS Kanbei: Units cost +20% more, but gain +20% attack and defense.",
+        "DayToDayPower": {
+            "UnitPriceMultiplier": 1.2,
+            "PowerIncreases": [
+                {
+                    "AffectedUnits": [ "all" ],
+                    "PowerIncrease": 0.2,
+                    "DefenseIncrease": 0.2
+                }
+            ]
+        },
+        "NormalPower": {
+            "PowerStars": 4,
+            "PowerIncreases": [
+                {
+                    "AffectedUnits": [ "all" ],
+                    "PowerIncrease": 0.3
+                }
+                //Morale Boost brings the day to day +20% up to +50% in total.
+            ]
+        },
+        "SuperPower": {
+            "PowerStars": 7,
+            "CounterAttackPower": 2.0,
+            "PowerIncreases": [
+                {
+                    "AffectedUnits": [ "all" ],
+                    "PowerIncrease": 0.3,
+                    "DefenseIncrease": 0.3
+                    //Samurai Spirit brings both up to +50% in total, and doubles counter damage.
+                }
+            ]
+        }
+    },
+    "DS Olaf": {
+        "Name": "DS Olaf",
+        "AWBWID": 9,
+        "VariantOf": "Olaf",
+        "ToolTip": "DS Olaf: Unaffected by snow, and gains +20% attack during it. Snow does not slow movement, it only doubles enemy fuel usage.",
+        "DayToDayPower": {
+            "WeatherWithNoMovementAffect": "Snow"
+            //Additional effect: +20% firepower while it is snowing, which this program has no way
+            //to make conditional on the weather.
+        },
+        "NormalPower": {
+            "PowerStars": 3
+            //Additional Effects: Changes the weather to snow for 2 days.
+        },
+        "SuperPower": {
+            "PowerStars": 7
+            //Additional Effects: Damages all enemy units for 2HP (but doesn't kill), and changes
+            //the weather to snow for 2 days.
+        }
+    },
+    "DS Sonja": {
+        "Name": "DS Sonja",
+        "AWBWID": 18,
+        "VariantOf": "Sonja",
+        "ToolTip": "DS Sonja: Units gain +1 vision in fog and have hidden HP. Luck is -4% to +9%. Enemy units in combat with her lose 1 terrain star.",
+        "DayToDayPower": {
+            "HiddenHP": true,
+            "SightIncrease": 1,
+            "LuckRange": { "x": -4, "y": 9 },
+            //The tournament's chart says nothing either way about counterattacks, so Sonja's own
+            //1.5x is kept rather than dropped. Provisional, like her luck range.
+            "CounterAttackPower": 1.5
+            //Additional effect: enemies in combat with her lose 1 terrain star.
+        },
+        "NormalPower": {
+            "PowerStars": 3,
+            "SightIncrease": 1,
+            "SeeIntoHiddenTiles": true
+            //Additional effect: enemies lose a second terrain star, for 2 in total.
+        },
+        "SuperPower": {
+            "PowerStars": 5,
+            "SightIncrease": 1,
+            "SeeIntoHiddenTiles": true,
+            "AttackFirst": true
+            //Additional effect: enemies lose a third terrain star, for 3 in total.
+        }
     }
 }

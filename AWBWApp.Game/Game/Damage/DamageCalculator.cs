@@ -24,17 +24,6 @@ namespace AWBWApp.Game.Game.Damage
     /// </remarks>
     public class DamageCalculator
     {
-        /// <summary>
-        /// Sonja's day to day, the one thing that makes a counterattack differ from an attack.
-        /// </summary>
-        /// <remarks>
-        /// The spreadsheet models no counterattacks at all, so unlike everything else here this
-        /// multiplier is not pinned to it. It is applied as firepower, alongside the CO bonuses
-        /// and before luck, which is the reading that matches "counterattacks do 1.5x damage".
-        /// </remarks>
-        private const double sonja_counter_multiplier = 1.5;
-
-        private const string sonja = "Sonja";
         private const string colin = "Colin";
         private const string kindle = "Kindle";
         private const string secondary_weapon_suffix = "-Secondary";
@@ -57,21 +46,24 @@ namespace AWBWApp.Game.Game.Damage
             if (!tryChooseWeapon(attacker, defender, out var baseDamage, out var usedSecondary))
                 return DamageResult.CANNOT_ATTACK;
 
-            var attackModifier = charts.GetAttackModifier(attacker.COState, attacker.Unit.Name)
-                                 + charts.GetTerrainAttackModifier(attacker.COState, attacker.Terrain)
+            var attackModifier = charts.GetAttackModifier(attacker.COState, attacker.Unit.Name, attacker.BaseCOState)
+                                 + charts.GetTerrainAttackModifier(attacker.COState, attacker.Terrain, attacker.BaseCOState)
                                  + attacker.ComTowers
                                  + getStateDependentAttackModifier(attacker);
 
-            var defenceModifier = charts.GetDefenceModifier(defender.COState, defender.Unit.Name);
+            var defenceModifier = charts.GetDefenceModifier(defender.COState, defender.Unit.Name, defender.BaseCOState);
 
             //Javier's whole gimmick, and the only entry in that table.
             if (IsIndirect(attacker.Unit))
-                defenceModifier += charts.GetDefenceModifierAgainstIndirects(defender.COState);
+                defenceModifier += charts.GetDefenceModifierAgainstIndirects(defender.COState, defender.BaseCOState);
 
             var firepower = 1 + attackModifier * 0.1;
 
-            if (situation.IsCounterAttack && defender.CO == sonja)
-                firepower *= sonja_counter_multiplier;
+            //A counterattack is the same fight with the roles swapped, so the one swinging here is
+            //the unit that was attacked, and the bonus for hitting back is theirs. Sonja has one
+            //day-to-day; Kanbei's comes with his super.
+            if (situation.IsCounterAttack)
+                firepower *= attacker.CounterAttackPower;
 
             //A unit at 3 hit points hits at three tenths strength.
             var attackerStrength = Math.Clamp(attacker.HitPoints, 0, 10) / 10.0;
@@ -81,10 +73,14 @@ namespace AWBWApp.Game.Game.Damage
             var defenderStrength = Math.Clamp(defender.HitPoints, 0, 10);
             var resistance = 1 - defender.TerrainStars * 0.1 * defenderStrength * 0.1 - defenceModifier * 0.1;
 
+            //Bad luck can be worth more than the attack itself: Sonja rolls down to -9, and
+            //Jugger's super down to -44, which is more than a weak attack deals in the first
+            //place. An attack that goes that badly simply does nothing, rather than healing what
+            //it hit.
             int damageForLuck(int luck) =>
-                (int)Math.Truncate((baseDamage * firepower + luck) * attackerStrength * resistance + 0.05);
+                Math.Max(0, (int)Math.Truncate((baseDamage * firepower + luck) * attackerStrength * resistance + 0.05));
 
-            var outcomes = buildOutcomes(charts.GetLuckRolls(attacker.COState), damageForLuck);
+            var outcomes = buildOutcomes(charts.GetLuckRolls(attacker.COState, attacker.BaseCOState), damageForLuck);
 
             return new DamageResult
             {
@@ -274,12 +270,12 @@ namespace AWBWApp.Game.Game.Damage
 
             //Colin's Power of Money: +3% for every 1000 funds in the bank, scaling continuously -
             //a partial thousand pays out its share, as the website's own calculator does.
-            if (state.CO == colin)
+            if (state.IsCO(colin))
                 return state.Funds / 1000.0 * 0.3;
 
             //Kindle's High Society: +3% for every city held, on top of her urban bonus. AWBW
             //counts cities alone here, where the home games counted every property.
-            if (state.CO == kindle)
+            if (state.IsCO(kindle))
                 return state.Cities * 0.3;
 
             return 0;

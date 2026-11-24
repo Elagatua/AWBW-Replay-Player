@@ -99,7 +99,7 @@ namespace AWBWApp.Game.API.Replay.Actions
             context.FundsValuesForPlayers[context.ActivePlayerID] = FundsAfterRepair;
             context.StatsReadouts[context.ActivePlayerID].MoneySpentOnRepairingUnits += repairCost;
 
-            var co = controller.COStorage.GetCOByAWBWId(context.PlayerTurns[context.ActivePlayerID].ActiveCOID);
+            var co = controller.COStorage.GetCOPlayedBy(context.PlayerTurns[context.ActivePlayerID]);
             repairValue = ReplayActionHelper.CalculateUnitCost(repairedUnit, co.DayToDayPower, null) - ReplayActionHelper.CalculateUnitCost(originalRepairedUnit, co.DayToDayPower, null);
         }
 
