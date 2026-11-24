@@ -44,7 +44,14 @@ namespace AWBWApp.Game.UI.Select
 
                     foreach (var coID in player.Value.COsUsedByPlayer)
                     {
-                        if (coStorage.TryGetCOByAWBWId(coID, out var co))
+                        //A tournament variant shares its base's id, so the id alone would name the
+                        //CO it stands in for. Whether the replay gave that CO a super power to
+                        //charge is the one thing that tells them apart, and it was noted down when
+                        //the replay was indexed. An entry indexed before that has no note, and
+                        //falls back to the id's own CO.
+                        var hasSuperPower = player.Value.COsWithoutSuperPower?.Contains(coID) != true;
+
+                        if (coStorage.TryGetCOPlayed(coID, hasSuperPower, out var co))
                             userText += $"{co.Name}, ";
                     }
                     userText = userText[..^2] + ")";

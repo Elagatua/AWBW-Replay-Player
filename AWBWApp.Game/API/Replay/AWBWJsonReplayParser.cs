@@ -159,7 +159,41 @@ namespace AWBWApp.Game.API.Replay
                 throw new CorruptedReplayException(e);
             }
 
+            recordCOsWithoutSuperPower(replayData);
+
             return replayData;
+        }
+
+        /// <summary>
+        /// Notes, per player, which of their COs the replay never gave a super power to charge.
+        /// </summary>
+        /// <remarks>
+        /// Only a CO that lost a power looks like this, so it is what lets a tournament variant be
+        /// told apart from the CO it stands in for. Keeping it on <see cref="ReplayUser"/> means
+        /// the replay list can name the right CO from the index alone.
+        /// </remarks>
+        private void recordCOsWithoutSuperPower(ReplayData replayData)
+        {
+            foreach (var player in replayData.ReplayInfo.Players.Values)
+                player.COsWithoutSuperPower = new HashSet<int>();
+
+            foreach (var turn in replayData.TurnData)
+            {
+                if (turn.Players == null)
+                    continue;
+
+                foreach (var playerTurn in turn.Players)
+                {
+                    if (!replayData.ReplayInfo.Players.TryGetValue(playerTurn.Key, out var player))
+                        continue;
+
+                    if (!playerTurn.Value.RequiredPowerForSuper.HasValue)
+                        player.COsWithoutSuperPower.Add(playerTurn.Value.ActiveCOID);
+
+                    if (playerTurn.Value.TagCOID.HasValue && !playerTurn.Value.TagRequiredPowerForSuper.HasValue)
+                        player.COsWithoutSuperPower.Add(playerTurn.Value.TagCOID.Value);
+                }
+            }
         }
 
         private void readTurn(ReplayData replayData, ReadOnlySpan<char> text, ref int textIndex, bool firstTurn)

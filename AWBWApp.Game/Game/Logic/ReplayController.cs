@@ -43,6 +43,9 @@ namespace AWBWApp.Game.Game.Logic
         [Resolved]
         public COStorage COStorage { get; private set; }
 
+        [Resolved(CanBeNull = true)]
+        private IO.ReplayManager replayManager { get; set; }
+
         [Resolved]
         private CountryStorage countryStorage { get; set; }
 
@@ -391,6 +394,7 @@ namespace AWBWApp.Game.Game.Logic
                 currentActionIndex = -1;
                 CurrentTurnIndex.Value = 0;
 
+                replayData.ApplyCOVariantChoices();
                 setupActions();
                 updatePlayerList(0, reset: true, undo: false);
 
@@ -444,6 +448,55 @@ namespace AWBWApp.Game.Game.Logic
                 Players.Add(player.Key, new PlayerInfo(player.Value, countryStorage.SafeGetCountryByAWBWID(player.Value.CountryID)));
 
             setupActions(logDesyncs: false);
+        }
+
+        /// <summary>
+        /// Records which CO a player was really using, for the variants a replay cannot tell
+        /// apart, and loads the replay again so everything is built from the new answer.
+        /// </summary>
+        /// <remarks>
+        /// The setup pass cannot simply be run a second time. Each action keeps the state it needs
+        /// to undo itself, built the first time it was set up, so setting it up again throws on
+        /// its own leftovers. Reading the replay back gives a fresh set of actions, which is the
+        /// only safe way to redo a pass that a CO's day to day feeds into.
+        /// </remarks>
+        public void SetCOVariant(long playerID, int coID, string coName)
+        {
+            if (replayData?.ReplayInfo?.Players == null || !replayData.ReplayInfo.Players.TryGetValue(playerID, out var player))
+                return;
+
+            player.COVariants ??= new Dictionary<int, string>();
+
+            if (player.COVariants.TryGetValue(coID, out var current) && current == coName)
+                return;
+
+            player.COVariants[coID] = coName;
+
+            var info = replayData.ReplayInfo;
+            replayManager?.UpdateReplayInfo(info);
+
+            if (replayManager == null)
+                return;
+
+            var returnToTurn = CurrentTurnIndex.Value;
+
+            try
+            {
+                var reloaded = replayManager.GetReplayDataSync(info.ID);
+
+                //Keep what we already know about this replay rather than the bare facts a fresh
+                //read gives: usernames and the user's own choices are not in the file.
+                reloaded.ReplayInfo = info;
+
+                LoadReplay(reloaded, replayMap);
+
+                if (returnToTurn > 0)
+                    ScheduleAfterChildren(() => goToTurnWithIdxAndShowLastAction(returnToTurn));
+            }
+            catch (Exception e)
+            {
+                ShowError(e, false);
+            }
         }
 
         private void setupActions(bool logDesyncs = true)

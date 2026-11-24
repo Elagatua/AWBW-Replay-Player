@@ -851,5 +851,132 @@
             //Additional Effect: Fire a 2 range missile dealing 8 damage, aimed at the greatest
             //accumulation of unit value.
         }
+    },
+
+    /*
+     * The DS reworks keep both of their powers, and their star costs, so nothing in a replay
+     * tells them apart from the CO they stand in for. They are only ever chosen by hand.
+     */
+
+    "DS Jess": {
+        "Name": "DS Jess",
+        "AWBWID": 14,
+        "VariantOf": "Jess",
+        "ToolTip": "DS Jess: Vehicles gain +20% attack, but all other units except footsoldiers lose -10% attack.",
+        "DayToDayPower": {
+            "PowerIncreases": [
+                {
+                    "AffectedUnits": [ "Anti-Air", "APC", "Artillery", "Md.Tank", "Mega Tank", "Missile", "Neotank", "Piperunner", "Recon", "Rocket", "Tank" ],
+                    "PowerIncrease": 0.2
+                },
+                {
+                    "AffectedUnits": [ "B-Copter", "Battleship", "Black Boat", "Black Bomb", "Bomber", "Carrier", "Cruiser", "Fighter", "Lander", "Stealth", "Sub", "T-Copter" ],
+                    "PowerIncrease": -0.1
+                }
+            ]
+        },
+        "NormalPower": {
+            "PowerStars": 3,
+            "PowerIncreases": [
+                {
+                    "AffectedUnits": [ "Anti-Air", "APC", "Artillery", "Md.Tank", "Mega Tank", "Missile", "Neotank", "Piperunner", "Recon", "Rocket", "Tank" ],
+                    "PowerIncrease": 0.4
+                }
+                //Additional Effects: Vehicles get +1 Movement. All units resupply fuel and ammo.
+            ]
+        },
+        "SuperPower": {
+            "PowerStars": 6,
+            "PowerIncreases": [
+                {
+                    "AffectedUnits": [ "Anti-Air", "APC", "Artillery", "Md.Tank", "Mega Tank", "Missile", "Neotank", "Piperunner", "Recon", "Rocket", "Tank" ],
+                    "PowerIncrease": 0.6
+                }
+                //Additional Effects: Vehicles get +2 Movement. All units resupply fuel and ammo.
+            ]
+        }
+    },
+    "DS Kanbei": {
+        "Name": "DS Kanbei",
+        "AWBWID": 3,
+        "VariantOf": "Kanbei",
+        "ToolTip": "DS Kanbei: Units cost +20% more, but gain +20% attack and defense.",
+        "DayToDayPower": {
+            "UnitPriceMultiplier": 1.2,
+            "PowerIncreases": [
+                {
+                    "AffectedUnits": [ "all" ],
+                    "PowerIncrease": 0.2,
+                    "DefenseIncrease": 0.2
+                }
+            ]
+        },
+        "NormalPower": {
+            "PowerStars": 4,
+            "PowerIncreases": [
+                {
+                    "AffectedUnits": [ "all" ],
+                    "PowerIncrease": 0.3
+                }
+                //Morale Boost brings the day to day +20% up to +50% in total.
+            ]
+        },
+        "SuperPower": {
+            "PowerStars": 7,
+            "CounterAttackPower": 2.0,
+            "PowerIncreases": [
+                {
+                    "AffectedUnits": [ "all" ],
+                    "PowerIncrease": 0.3,
+                    "DefenseIncrease": 0.3
+                    //Samurai Spirit brings both up to +50% in total, and doubles counter damage.
+                }
+            ]
+        }
+    },
+    "DS Olaf": {
+        "Name": "DS Olaf",
+        "AWBWID": 9,
+        "VariantOf": "Olaf",
+        "ToolTip": "DS Olaf: Unaffected by snow, and gains +20% attack during it. Snow does not slow movement, it only doubles enemy fuel usage.",
+        "DayToDayPower": {
+            "WeatherWithNoMovementAffect": "Snow"
+            //Additional effect: +20% firepower while it is snowing, which this program has no way
+            //to make conditional on the weather.
+        },
+        "NormalPower": {
+            "PowerStars": 3
+            //Additional Effects: Changes the weather to snow for 2 days.
+        },
+        "SuperPower": {
+            "PowerStars": 7
+            //Additional Effects: Damages all enemy units for 2HP (but doesn't kill), and changes
+            //the weather to snow for 2 days.
+        }
+    },
+    "DS Sonja": {
+        "Name": "DS Sonja",
+        "AWBWID": 18,
+        "VariantOf": "Sonja",
+        "ToolTip": "DS Sonja: Units gain +1 vision in fog and have hidden HP. Luck is -4% to +9%. Enemy units in combat with her lose 1 terrain star.",
+        "DayToDayPower": {
+            "HiddenHP": true,
+            "SightIncrease": 1,
+            "LuckRange": { "x": -4, "y": 9 }
+            //Additional effect: enemies in combat with her lose 1 terrain star.
+        },
+        "NormalPower": {
+            "PowerStars": 3,
+            "SightIncrease": 1,
+            "SeeIntoHiddenTiles": true
+            //Additional effect: enemies lose a second terrain star, for 2 in total.
+        },
+        "SuperPower": {
+            "PowerStars": 5,
+            "SightIncrease": 1,
+            "SeeIntoHiddenTiles": true,
+            "AttackFirst": true
+            //Additional effect: enemies lose a third terrain star, for 3 in total.
+        }
     }
 }

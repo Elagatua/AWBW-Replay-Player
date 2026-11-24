@@ -114,6 +114,15 @@ namespace AWBWApp.Game.IO
                     continue;
                 }
 
+                //An entry indexed before COs that lost a power were noted down cannot say which
+                //CO was really played, so it has to be read again. Parsing it puts it back into
+                //the index, so this happens once per replay rather than on every launch.
+                if (replayInfo.Players.Values.Any(x => x.COsWithoutSuperPower == null))
+                {
+                    newReplays.Add(file);
+                    continue;
+                }
+
                 foreach (var player in replayInfo.Players)
                 {
                     if (player.Value.Username != null)
@@ -244,7 +253,12 @@ namespace AWBWApp.Game.IO
 
         private void addReplay(ReplayData data)
         {
-            var containedAlready = knownReplays.ContainsKey(data.ReplayInfo.ID);
+            var containedAlready = knownReplays.TryGetValue(data.ReplayInfo.ID, out var existing);
+
+            //Parsing a replay again produces everything the file says, and nothing the user told
+            //us, so anything they set by hand has to be carried across or it is quietly lost.
+            if (containedAlready)
+                data.ReplayInfo.CarryOverUserChoicesFrom(existing);
 
             knownReplays[data.ReplayInfo.ID] = data.ReplayInfo;
             saveReplays();
@@ -548,6 +562,20 @@ namespace AWBWApp.Game.IO
 
             saveReplays();
             saveUsernames();
+        }
+
+        /// <summary>
+        /// Writes an already indexed replay's entry back out, after something the user chose about
+        /// it changed.
+        /// </summary>
+        public void UpdateReplayInfo(ReplayInfo replay)
+        {
+            if (replay == null || !knownReplays.ContainsKey(replay.ID))
+                return;
+
+            knownReplays[replay.ID] = replay;
+            ReplayChanged?.Invoke(replay);
+            saveReplays();
         }
 
         public void UpdateGameName(ReplayInfo replay, string newName)

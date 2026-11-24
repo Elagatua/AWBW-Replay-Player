@@ -73,6 +73,22 @@ namespace AWBWApp.Game.Game.COs
         /// program gave before it knew variants existed.
         /// </para>
         /// </remarks>
+        /// <summary>
+        /// <see cref="GetCOPlayed"/> for an id this build may not know, such as a CO AWBW has
+        /// added since.
+        /// </summary>
+        public bool TryGetCOPlayed(int id, bool hasSuperPower, out COData co)
+        {
+            if (!coByAWBWId.ContainsKey(id))
+            {
+                co = null;
+                return false;
+            }
+
+            co = GetCOPlayed(id, hasSuperPower);
+            return true;
+        }
+
         public COData GetCOPlayed(int id, bool hasSuperPower)
         {
             var co = GetCOByAWBWId(id);

@@ -86,6 +86,13 @@ namespace AWBWApp.Game.Tests.Replays
 
                             if (co.SuperPower != null)
                                 failures.Add($"{Path.GetFileName(replay)}: day {turn.Day} resolved a CO with no super power to {co.Name}, which has one.");
+
+                            //The replay list works off this note rather than the turn data, so the
+                            //two have to agree or the list names a different CO to the replay.
+                            var noted = data.ReplayInfo.Players[player.Key].COsWithoutSuperPower;
+
+                            if (noted == null || !noted.Contains(player.Value.ActiveCOID))
+                                failures.Add($"{Path.GetFileName(replay)}: day {turn.Day} player {player.Key} plays {co.Name}, which has no super power, but the index does not say so.");
                         }
                     }
                 }

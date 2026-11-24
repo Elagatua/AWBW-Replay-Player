@@ -62,6 +62,11 @@ namespace AWBWApp.Game.UI.Replay
         [Resolved]
         private CountryStorage countryStorage { get; set; }
 
+        [Resolved]
+        private Game.COs.COStorage coStorage { get; set; }
+
+        private readonly PlayerInfo playerInfo;
+
         private Bindable<FaceDirection> faceDirection;
         private Bindable<object> countryBindable;
         private Action<long> openPlayerStats;
@@ -74,6 +79,7 @@ namespace AWBWApp.Game.UI.Replay
 
         public ReplayPlayerListItem(ReplayPlayerList playerList, PlayerInfo info, Action<long> openPlayerStats, bool usePercentagePowers, Func<long, List<DrawableUnit>> getUnits, IBindable<bool> ShowClock)
         {
+            playerInfo = info;
             PlayerID = info.ID;
             RoundOrder = info.RoundOrder;
             EliminatedOn = info.EliminatedOn;
@@ -606,10 +612,48 @@ namespace AWBWApp.Game.UI.Replay
                 countryMenuItem
             };
 
+            var coVariantMenuItem = createCOVariantMenuItem();
+
+            if (coVariantMenuItem != null)
+                items.Add(coVariantMenuItem);
+
             if (playerList != null)
                 items.AddRange(playerList.ContextMenuItems);
 
             return items.ToArray();
+        }
+
+        /// <summary>
+        /// Lets the user say which CO this player was really using, where the replay cannot.
+        /// </summary>
+        /// <remarks>
+        /// A tournament variant that kept its base's powers leaves nothing in a replay to go on,
+        /// so the only way to see it is to be told. Offered only where there is a choice to make.
+        /// </remarks>
+        private MenuItem createCOVariantMenuItem()
+        {
+            var currentCO = playerInfo?.ActiveCO.Value.CO;
+
+            if (currentCO == null || playerList?.Controller == null)
+                return null;
+
+            var choices = coStorage.GetCOsSharingAWBWId(currentCO.AWBWID);
+
+            if (choices.Count <= 1)
+                return null;
+
+            var bindable = new Bindable<object>(currentCO.Name);
+
+            bindable.BindValueChanged(x =>
+            {
+                if (x.NewValue is string name && name != currentCO.Name)
+                    playerList.Controller.SetCOVariant(PlayerID, currentCO.AWBWID, name);
+            });
+
+            return new MenuItem("CO Variant")
+            {
+                Items = choices.Select(x => (MenuItem)new StatefulMenuItem(x.Name, bindable, x.Name)).ToArray()
+            };
         }
 
         private partial class ReplayPlayerInfo : Container
