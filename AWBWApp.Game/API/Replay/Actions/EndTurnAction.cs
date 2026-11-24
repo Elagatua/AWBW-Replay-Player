@@ -58,7 +58,12 @@ namespace AWBWApp.Game.API.Replay.Actions
             var nextTeam = replayData.ReplayInfo.Players[action.NextPlayerID].TeamName;
 
             action.FundsAfterTurnStart = (int)ReplayActionHelper.GetPlayerSpecificDataFromJObject((JObject)updatedInfo["nextFunds"], nextTeam, action.NextPlayerID);
-            action.NextWeatherType = WeatherHelper.ParseWeatherCode((string)updatedInfo["nextWeather"]);
+            var nextWeather = (string)updatedInfo["nextWeather"];
+
+            if (WeatherHelper.TryParseTimedWeatherCode(nextWeather, out var weatherDaysRemaining))
+                action.NextWeatherDaysRemaining = weatherDaysRemaining;
+            else
+                action.NextWeatherType = WeatherHelper.ParseWeatherCode(nextWeather);
 
             var suppliedData = updatedInfo["supplied"];
 
@@ -101,6 +106,13 @@ namespace AWBWApp.Game.API.Replay.Actions
 
         public int FundsAfterTurnStart;
         public WeatherType NextWeatherType;
+
+        /// <summary>
+        /// Set when the replay reported the next weather as the number of days a CO power's
+        /// weather has left rather than naming it. <see cref="NextWeatherType"/> is filled in by
+        /// <see cref="ReplayPostProcessor"/> before playback ever reads it.
+        /// </summary>
+        public int? NextWeatherDaysRemaining;
 
         public HashSet<long> SuppliedUnits;
         public Dictionary<long, int> RepairedUnits;

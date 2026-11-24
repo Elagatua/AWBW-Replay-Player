@@ -397,7 +397,11 @@ namespace AWBWApp.Game.API.Replay
 
                         if (newTurn.StartWeather == null)
                             newTurn.StartWeather = new ReplayWeather();
-                        newTurn.StartWeather.Type = WeatherHelper.ParseWeatherCode(value);
+
+                        if (WeatherHelper.TryParseTimedWeatherCode(value, out var daysRemaining))
+                            newTurn.StartWeather.DaysRemaining = daysRemaining;
+                        else
+                            newTurn.StartWeather.Type = WeatherHelper.ParseWeatherCode(value);
                         break;
                     }
 
@@ -679,28 +683,28 @@ namespace AWBWApp.Game.API.Replay
 
                         case "co_max_power":
                         {
-                            var powerRequired = readNullableInteger(text, ref textIndex);
+                            var powerRequired = readPowerRequirement(text, ref textIndex);
                             playerDataTurn.RequiredPowerForNormal = powerRequired;
                             break;
                         }
 
                         case "co_max_spower":
                         {
-                            var powerRequired = readNullableInteger(text, ref textIndex);
+                            var powerRequired = readPowerRequirement(text, ref textIndex);
                             playerDataTurn.RequiredPowerForSuper = powerRequired;
                             break;
                         }
 
                         case "tags_co_max_power":
                         {
-                            var powerRequired = readNullableInteger(text, ref textIndex);
+                            var powerRequired = readPowerRequirement(text, ref textIndex);
                             playerDataTurn.TagRequiredPowerForNormal = powerRequired;
                             break;
                         }
 
                         case "tags_co_max_spower":
                         {
-                            var powerRequired = readNullableInteger(text, ref textIndex);
+                            var powerRequired = readPowerRequirement(text, ref textIndex);
                             playerDataTurn.TagRequiredPowerForSuper = powerRequired;
                             break;
                         }
@@ -1537,6 +1541,24 @@ namespace AWBWApp.Game.API.Replay
             }
             var number = text[startIndex..(index - 1)];
             return long.Parse(number, NumberStyles.Any, CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>
+        /// Reads a CO power meter requirement, mapping AWBW's "this CO does not have this power"
+        /// marker onto null.
+        /// </summary>
+        /// <remarks>
+        /// A CO with no super power (the AW1-era COs used by the Mini Amarriner Cup, such as
+        /// Clone Andy or AW1 Drake) reports a *negative* co_max_spower. AWBW keeps escalating its
+        /// magnitude by 18000 per star every time a power is used, so only the sign carries
+        /// meaning. Von Bolt, who has no normal power, is marked differently: AWBW sets his
+        /// co_max_power equal to his co_max_spower instead.
+        /// </remarks>
+        private int? readPowerRequirement(ReadOnlySpan<char> text, ref int index)
+        {
+            var powerRequired = readNullableInteger(text, ref index);
+
+            return powerRequired < 0 ? null : powerRequired;
         }
 
         private int? readNullableInteger(ReadOnlySpan<char> text, ref int index)
