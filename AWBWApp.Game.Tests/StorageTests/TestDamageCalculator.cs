@@ -377,6 +377,33 @@ namespace AWBWApp.Game.Tests.StorageTests
             }
         }
 
+        /// <summary>
+        /// Bad luck can be worth more than a weak attack is, and an attack that goes that badly
+        /// does nothing rather than healing what it hit.
+        /// </summary>
+        [Test]
+        public void TheWorstLuckNeverHealsTheDefender()
+        {
+            //Infantry into a Neotank is about as little damage as the charts hold, and Sonja
+            //rolls down to -9 on top of it.
+            var result = calculator.Calculate(situation("Infantry", "Neotank", attackerCO: "Sonja", stars: 4));
+
+            Assert.That(result.CanAttack, Is.True);
+            Assert.That(result.Outcomes.Select(x => x.Damage), Has.All.GreaterThanOrEqualTo(0));
+            Assert.That(result.Outcomes.Select(x => x.Damage), Has.Some.EqualTo(0), "The worst rolls here should come to nothing at all.");
+        }
+
+        /// <summary>
+        /// Jugger's super rolls down to -44, far past what most attacks deal.
+        /// </summary>
+        [Test]
+        public void JuggersSuperNeverHealsTheDefender()
+        {
+            var result = calculator.Calculate(situation("Infantry", "Neotank", attackerCO: "Jugger", attackerPower: ActiveCOPower.Super, stars: 4));
+
+            Assert.That(result.Outcomes.Select(x => x.Damage), Has.All.GreaterThanOrEqualTo(0));
+        }
+
         private (int, int) luckBounds(string coState)
         {
             var rolls = charts.GetLuckRolls(coState).Keys.Select(int.Parse).ToList();

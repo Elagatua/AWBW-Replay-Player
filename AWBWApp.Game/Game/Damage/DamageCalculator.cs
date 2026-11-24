@@ -81,8 +81,12 @@ namespace AWBWApp.Game.Game.Damage
             var defenderStrength = Math.Clamp(defender.HitPoints, 0, 10);
             var resistance = 1 - defender.TerrainStars * 0.1 * defenderStrength * 0.1 - defenceModifier * 0.1;
 
+            //Bad luck can be worth more than the attack itself: Sonja rolls down to -9, and
+            //Jugger's super down to -44, which is more than a weak attack deals in the first
+            //place. An attack that goes that badly simply does nothing, rather than healing what
+            //it hit.
             int damageForLuck(int luck) =>
-                (int)Math.Truncate((baseDamage * firepower + luck) * attackerStrength * resistance + 0.05);
+                Math.Max(0, (int)Math.Truncate((baseDamage * firepower + luck) * attackerStrength * resistance + 0.05));
 
             var outcomes = buildOutcomes(charts.GetLuckRolls(attacker.COState), damageForLuck);
 

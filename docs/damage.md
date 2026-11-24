@@ -30,13 +30,21 @@ change, change the spreadsheet and regenerate.
 With every modifier expressed in **tenths** — `1` means `+10%`:
 
 ```
-damage = trunc( (base × (1 + attack/10) + luck)
-                × (attackerHP / 10)
-                × (1 − stars/10 × defenderHP/10 − defence/10)
-                + 0.05 )
+damage = max( 0,
+              trunc( (base × (1 + attack/10) + luck)
+                     × (attackerHP / 10)
+                     × (1 − stars/10 × defenderHP/10 − defence/10)
+                     + 0.05 ) )
 ```
 
-Four things about this are easy to get wrong:
+Five things about this are easy to get wrong:
+
+- **The floor is not decoration.** Bad luck is applied before anything scales it,
+  and it can be worth more than a weak attack is: Sonja rolls down to `-9` and
+  Jugger's super to `-44`, so an infantry swinging at a Neotank on a mountain
+  comes out negative. Without the `max`, the attack heals its target —
+  `HitPointBelief.WithDamage` indexes an array by `hitPoints − damage` and walks
+  off the end of it.
 
 - **`base` is a percentage** and the result is on the **0–100 scale** the replay
   stores, not the 1–10 the game shows. `55` is five and a half hearts. Dividing
