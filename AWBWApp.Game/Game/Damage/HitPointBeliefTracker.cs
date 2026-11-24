@@ -183,10 +183,21 @@ namespace AWBWApp.Game.Game.Damage
         /// Called after each action, and once more at the head of every turn so that a unit which
         /// has never been touched still starts out known.
         /// </remarks>
-        public void ObserveUnits(ReplaySetupContext context, ISet<long> changedUnits, int turnIndex, int actionIndex)
+        public void ObserveUnits(ReplaySetupContext context, int turnIndex, int actionIndex)
         {
+            //Nothing here is told that a unit's hit points moved behind its back, because inside a
+            //turn there is nothing that could tell it. The stored figure is exact where it came
+            //from the turn's snapshot and whole where an action has written over it, so a unit
+            //that walks across the map goes from 7.8 to 8 having taken no damage at all. Watching
+            //the stored value for changes reads that as a hit and throws away everything worked
+            //out about the unit.
+            //
+            //Nothing is lost by not watching. A change the board shows is handled by ruling values
+            //out below - a belief lives inside one tenth, so a new tenth contradicts all of it and
+            //falls back to what is displayed. A change the board does not show is caught at the
+            //head of the next turn, where the snapshot can be checked against the belief.
             foreach (var unit in context.Units)
-                apply(unit.Key, displayedHitPoints(unit.Value), changedUnits != null && changedUnits.Contains(unit.Key), turnIndex, actionIndex);
+                apply(unit.Key, displayedHitPoints(unit.Value), false, turnIndex, actionIndex);
 
             //Whatever this action accounted for is spent. Leaving it set would let an attack or a
             //repair excuse a later change it had nothing to do with.
