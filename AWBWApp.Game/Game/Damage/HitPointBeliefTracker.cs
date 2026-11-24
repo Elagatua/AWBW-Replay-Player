@@ -380,6 +380,7 @@ namespace AWBWApp.Game.Game.Damage
                 Ammo = unit.Ammo ?? unitData.MaxAmmo,
                 CO = playedCO?.Name,
                 BaseCO = playedCO?.VariantOf,
+                CounterAttackPower = playedCO?.GetCounterAttackPower(turn.COPowerOn) ?? 1,
                 Power = turn.COPowerOn,
                 ComTowers = countBuildings(context, unit.PlayerID.Value, "ComTower"),
                 Cities = countBuildings(context, unit.PlayerID.Value, "City"),

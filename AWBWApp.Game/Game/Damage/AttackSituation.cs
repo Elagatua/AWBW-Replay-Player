@@ -61,6 +61,16 @@ namespace AWBWApp.Game.Game.Damage
         public int TerrainStars { get; set; }
 
         /// <summary>
+        /// How much harder this unit hits back when it is the one being attacked. 1 for almost
+        /// everyone; Sonja counters at 1.5, Kanbei at 1.5 under his super, DS Kanbei at 2.
+        /// </summary>
+        /// <remarks>
+        /// Read from the CO rather than the charts, because the spreadsheet models no
+        /// counterattacks at all. See <c>docs/damage.md</c>.
+        /// </remarks>
+        public double CounterAttackPower { get; set; } = 1;
+
+        /// <summary>
         /// The key the charts file this CO under. Every CO has three rows, one per power state,
         /// and each power row already carries the universal +10% that any active power grants.
         /// </summary>
@@ -105,7 +115,8 @@ namespace AWBWApp.Game.Game.Damage
                 Cities = Cities,
                 Funds = Funds,
                 Terrain = Terrain,
-                TerrainStars = TerrainStars
+                TerrainStars = TerrainStars,
+                CounterAttackPower = CounterAttackPower
             };
         }
     }

@@ -1252,6 +1252,7 @@ namespace AWBWApp.Game.Game.Logic
                 Ammo = unit.Ammo.Value,
                 CO = player.ActiveCO.Value.CO?.Name,
                 BaseCO = player.ActiveCO.Value.CO?.VariantOf,
+                CounterAttackPower = player.ActiveCO.Value.CO?.GetCounterAttackPower(player.ActivePower.Value) ?? 1,
                 Power = player.ActivePower.Value,
                 ComTowers = Map.CountBuildingsForPlayer("ComTower", player.ID),
                 Cities = Map.CountBuildingsForPlayer("City", player.ID),

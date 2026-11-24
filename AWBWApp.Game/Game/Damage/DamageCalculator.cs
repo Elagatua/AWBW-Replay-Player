@@ -24,17 +24,6 @@ namespace AWBWApp.Game.Game.Damage
     /// </remarks>
     public class DamageCalculator
     {
-        /// <summary>
-        /// Sonja's day to day, the one thing that makes a counterattack differ from an attack.
-        /// </summary>
-        /// <remarks>
-        /// The spreadsheet models no counterattacks at all, so unlike everything else here this
-        /// multiplier is not pinned to it. It is applied as firepower, alongside the CO bonuses
-        /// and before luck, which is the reading that matches "counterattacks do 1.5x damage".
-        /// </remarks>
-        private const double sonja_counter_multiplier = 1.5;
-
-        private const string sonja = "Sonja";
         private const string colin = "Colin";
         private const string kindle = "Kindle";
         private const string secondary_weapon_suffix = "-Secondary";
@@ -70,8 +59,11 @@ namespace AWBWApp.Game.Game.Damage
 
             var firepower = 1 + attackModifier * 0.1;
 
-            if (situation.IsCounterAttack && defender.IsCO(sonja))
-                firepower *= sonja_counter_multiplier;
+            //A counterattack is the same fight with the roles swapped, so the one swinging here is
+            //the unit that was attacked, and the bonus for hitting back is theirs. Sonja has one
+            //day-to-day; Kanbei's comes with his super.
+            if (situation.IsCounterAttack)
+                firepower *= attacker.CounterAttackPower;
 
             //A unit at 3 hit points hits at three tenths strength.
             var attackerStrength = Math.Clamp(attacker.HitPoints, 0, 10) / 10.0;

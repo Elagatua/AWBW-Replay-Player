@@ -962,7 +962,10 @@
         "DayToDayPower": {
             "HiddenHP": true,
             "SightIncrease": 1,
-            "LuckRange": { "x": -4, "y": 9 }
+            "LuckRange": { "x": -4, "y": 9 },
+            //The tournament's chart says nothing either way about counterattacks, so Sonja's own
+            //1.5x is kept rather than dropped. Provisional, like her luck range.
+            "CounterAttackPower": 1.5
             //Additional effect: enemies in combat with her lose 1 terrain star.
         },
         "NormalPower": {

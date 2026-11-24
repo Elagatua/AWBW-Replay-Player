@@ -15,8 +15,12 @@ tables live in
 `DamageChart.json` is transcribed from **XHKOCalc**, the community multi-hit KO
 calculator (by *kilmefirst*, based on work by *Operation Mechstorm*). That
 spreadsheet is the reference this project trusts for combat, in preference to the
-CO power values in `COs.json` — those are used for movement and vision, are not
-consulted by any damage code, and at least Kindle's disagree with the AWBW wiki.
+CO power values in `COs.json` — those are mostly used for movement and vision,
+and at least Kindle's disagree with the AWBW wiki.
+
+The one exception is `CounterAttackPower`, which the damage code *does* read,
+because the spreadsheet has nothing to say about counterattacks. Attack and
+defence modifiers still come from the charts, never from `COs.json`.
 
 Where AWBW deviates from the cartridge games, the
 [AWBW wiki's changes page](https://awbw.fandom.com/wiki/Changes_in_AWBW) is the
@@ -347,14 +351,37 @@ than a modifier, and `ResolveExchange` resolves strictly attack-then-counter.
 **Pipe seams** attack using the Neotank row and are not affected by luck. Seams
 are buildings rather than units, so nothing reaches this code with one yet.
 
-### The one number not pinned to the spreadsheet
+### Counterattacks are not pinned to the spreadsheet
 
-Sonja's day-to-day gives counterattacks **1.5× damage**. The spreadsheet models
-no counterattacks at all, so unlike everything else here that multiplier has no
-reference value behind it. It is applied as firepower, alongside the CO bonuses
-and before luck, which is the reading that matches *"counterattacks do 1.5x
-damage"* — but it is a reading, and worth verifying against a real replay before
-anyone relies on it.
+The spreadsheet models no counterattacks at all, so none of this has a reference
+value behind it.
+
+A counterattack bonus comes from `COPower.CounterAttackPower` in `COs.json`,
+read off the CO rather than the charts, and reaches the calculator on
+`CombatantState.CounterAttackPower`. Three COs have one: Sonja at 1.5×
+day-to-day, Kanbei at 1.5× under his super, and DS Kanbei at 2×. A CO's
+day-to-day and active power are multiplied together, which is identity today
+since none has both.
+
+It is applied as firepower, alongside the CO bonuses and before luck, which is
+the reading that matches *"counterattacks do 1.5× damage"* — but it is a
+reading, and worth verifying against a real replay.
+
+**Which side it belongs to.** `Reversed()` makes a counter situation out of the
+opening one, so in it the **attacker** is the unit that was attacked and is now
+hitting back. The multiplier is therefore the attacker's. Reading it off the
+defender — the original aggressor — gives Sonja's opponent the bonus and denies
+it to Sonja, which is what the code did until the values became data-driven and
+made the mistake visible.
+
+Two consequences worth knowing:
+
+- **Kanbei's super now strengthens his counters.** The value was in `COs.json`
+  all along but nothing consulted it, so this is a behaviour change for ordinary
+  Kanbei games, not only for the variants.
+- **DS Sonja keeps Sonja's 1.5×.** The tournament's chart says nothing about
+  counters either way, so her entry states it explicitly rather than leaving it
+  to be inferred. Provisional, like her luck range.
 
 ## Regenerating the chart
 

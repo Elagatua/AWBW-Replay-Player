@@ -111,7 +111,17 @@ namespace AWBWApp.Game.Game.COs
 
         public COData GetCOByName(string name) => coByName[name];
 
-        public bool TryGetCOByName(string name, out COData co) => coByName.TryGetValue(name, out co);
+        public bool TryGetCOByName(string name, out COData co)
+        {
+            //A player can have no CO at all, so asking about one is not a mistake.
+            if (name == null)
+            {
+                co = null;
+                return false;
+            }
+
+            return coByName.TryGetValue(name, out co);
+        }
 
         /// <summary>
         /// Every CO that a replay reporting this id could actually be: the one AWBW plays by

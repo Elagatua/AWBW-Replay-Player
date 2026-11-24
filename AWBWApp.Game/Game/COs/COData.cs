@@ -30,6 +30,32 @@ namespace AWBWApp.Game.Game.COs
         public COPower DayToDayPower;
         public COPower NormalPower;
         public COPower SuperPower;
+
+        public COPower GetPower(ActiveCOPower power)
+        {
+            switch (power)
+            {
+                case ActiveCOPower.Normal:
+                    return NormalPower;
+
+                case ActiveCOPower.Super:
+                    return SuperPower;
+
+                default:
+                    return null;
+            }
+        }
+
+        /// <summary>
+        /// How much harder this CO's units hit back, with whatever power is running.
+        /// </summary>
+        /// <remarks>
+        /// Sonja's is day-to-day and Kanbei's comes with his super, so the two are multiplied
+        /// rather than one overriding the other. No CO has both, which makes that identity today,
+        /// but it is the reading that stays sensible if one ever does.
+        /// </remarks>
+        public double GetCounterAttackPower(ActiveCOPower power)
+            => (DayToDayPower?.CounterAttackPower ?? 1) * (GetPower(power)?.CounterAttackPower ?? 1);
     }
 
     public class COPower

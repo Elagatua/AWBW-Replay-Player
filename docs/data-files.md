@@ -150,7 +150,8 @@ AWBW ids. Never write a 1000+ id back into replay or map data.
 | `SightIncrease`, `SeeIntoHiddenTiles` | Fog modifiers, applied |
 | `AirFuelUsageDecrease` | Eagle day-to-day, applied at turn start |
 | `MoveCostPerTile`, `WeatherWithNoMovementAffect`, `WeatherWithAdditionalMovementAffect` | Sturm / Olaf / Drake; used by the movement-range overlay |
-| `LuckRange`, `CounterAttackPower`, `AttackFirst` | Recorded, not used — combat is never simulated |
+| `CounterAttackPower` | How much harder this CO's units hit back. The one CO power value the damage code reads, since the charts say nothing about counterattacks — see [damage.md](damage.md#counterattacks-are-not-pinned-to-the-spreadsheet) |
+| `LuckRange`, `AttackFirst` | Recorded, not used — the charts carry luck, and nothing models attack ordering |
 
 `PowerActionBuilder.compatibleCOs` is a separate whitelist of `<CO>-Y` / `<CO>-S`
 strings; a power from a CO not on it throws rather than mis-rendering.
