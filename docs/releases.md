@@ -15,6 +15,96 @@ which case it tags the commit it built.
 A platform that fails takes the release with it. That is deliberate: a release
 quietly missing a platform is worse than one that did not happen.
 
+## Which repository
+
+There are two remotes, and only one of them is ours:
+
+| Remote | Repository | What it is |
+|---|---|---|
+| `fork` | `Elagatua/AWBW-Replay-Player` | This project. Branches, pull requests, tags and releases all go here |
+| `origin` | `DeamonHunter/AWBW-Replay-Player` | The repository this was forked from. Read-only as far as this work goes |
+
+Nothing here is ever pushed to `origin`. `git push origin` would be aimed at
+somebody else's project.
+
+`gh` has **no default repository configured**, so a bare `gh pr list` or
+`gh release list` answers about whichever repo it guesses, which is usually not
+this one and usually silently. Pass `--repo Elagatua/AWBW-Replay-Player` to
+every `gh` command.
+
+## The path a release takes
+
+Work happens on `improvements` and reaches `master` through a pull request
+**within the fork** — `Elagatua:improvements` into `Elagatua:master`. The tag
+then goes on the merge commit that lands on `master`, not on the branch:
+`v0.14.5` points at `dca7d271`, which is *"Merge pull request #13 from
+Elagatua/improvements"*.
+
+```powershell
+gh pr create --repo Elagatua/AWBW-Replay-Player --base master --head improvements --title "..." --body-file body.md
+```
+
+```powershell
+gh pr merge 15 --repo Elagatua/AWBW-Replay-Player --merge
+```
+
+Merge commits rather than squashes, because that is what the tags point at.
+
+**Auto-merge rarely helps here.** The repository allows it, but GitHub refuses
+it with *"Pull request is in clean status"* whenever nothing is left to wait
+for — and nothing is, because the PR check (`dotnet.yml`) is not a *required*
+check on `master`, so a PR is mergeable the moment it opens. Waiting for the
+check and then merging is the whole of it. Making `dotnet.yml` a required check
+through branch protection would change that, and nobody has asked for it.
+
+## Choosing the version
+
+Both series of tags are visible locally, and only one of them is this fork's:
+
+| Series | Lives on | Whose |
+|---|---|---|
+| `v0.14.x` | `fork` | This project |
+| `v1.0.x` | `origin` | Upstream's |
+
+`git tag --sort=-v:refname | head` lists **upstream's first**, because the local
+repository has both remotes' tags. Taking the top of that list and adding one
+would publish a release claiming to be a version of a different project, and the
+updater would hand it to everyone. Ask the fork instead:
+
+```powershell
+gh release list --repo Elagatua/AWBW-Replay-Player --limit 5
+```
+
+Releases here have gone up a patch at a time, whatever the size of the change.
+Use the next patch unless the person asks for something else — the version is
+theirs to choose, not a detail to infer.
+
+## Checking a release landed
+
+Pushing the tag starts `release.yml`; it takes about four minutes. It is worth
+watching rather than assuming, because a failure part-way leaves a tag with no
+release behind it.
+
+```powershell
+gh run list --repo Elagatua/AWBW-Replay-Player --workflow release.yml --limit 2
+```
+
+```powershell
+gh run watch <run-id> --repo Elagatua/AWBW-Replay-Player --exit-status
+```
+
+Two things to confirm afterwards. All six jobs — `test`, `version`, `windows`,
+`macos`, `linux`, `release` — and that the index is whole:
+
+```powershell
+gh release download v0.14.6 --repo Elagatua/AWBW-Replay-Player --pattern RELEASES --dir .
+```
+
+`RELEASES` must name the **full** package as well as the deltas. That last line
+is the one the newline bug under [What a release
+contains](#what-a-release-contains) eats, and the one an install too old to
+follow the deltas depends on. v0.14.3 shipped without it.
+
 ## The version comes from the tag
 
 The tag with its leading `v` removed is passed to `dotnet publish` as

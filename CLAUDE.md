@@ -19,6 +19,9 @@ An Advance Wars By Web replay player, built on osu!framework (C#, .NET).
 - [docs/damage.md](docs/damage.md) — the damage formula and its charts; read
   before touching anything under `Game/Damage/`
 - [docs/gotchas.md](docs/gotchas.md) — the traps, in order of cost
+- [docs/releases.md](docs/releases.md) — cutting a release; read before pushing a
+  tag, because there are two remotes and two version series and only one of each
+  is ours
 
 ## Rules of thumb
 
