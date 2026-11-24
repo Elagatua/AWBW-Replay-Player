@@ -4,7 +4,7 @@
 
 | Project | Role |
 |---|---|
-| `AWBWApp.Game` | Everything: parsing, game logic, UI, editor. Changes almost always go here. |
+| `AWBWApp.Game` | Everything: parsing, game logic, UI. Changes almost always go here. |
 | `AWBWApp.Resources` | Embedded JSON data + textures + shaders. No logic. |
 | `AWBWApp.Desktop` | Windows/macOS/Linux entry point, auto-updater (Clowd.Squirrel). |
 | `AWBWApp.iOS` | iOS entry point. |

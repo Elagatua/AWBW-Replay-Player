@@ -1,7 +1,6 @@
 using System.Threading.Tasks;
 using AWBWApp.Game.API.Replay;
 using AWBWApp.Game.UI.Components;
-using AWBWApp.Game.UI.Editor;
 using AWBWApp.Game.UI.Interrupts;
 using AWBWApp.Game.UI.Replay;
 using AWBWApp.Game.UI.Select;
@@ -81,11 +80,6 @@ namespace AWBWApp.Game.UI
                         {
                             Text = "Import A Replay",
                             Action = openGetNewReplayInterrupt
-                        },
-                        new MainMenuButton(false)
-                        {
-                            Text = "Map Editor",
-                            Action = GoToMapEditor
                         }
                     }
                 },
@@ -188,9 +182,6 @@ namespace AWBWApp.Game.UI
         }
 
         public void GoToReplaySelect() => ScheduleAfterChildren(() => this.Push(consumeReplaySelect()));
-
-        public void GoToMapEditor() => ScheduleAfterChildren(() => this.Push(new EditorScreen()));
-
         private partial class MainMenuButton : BasicButton
         {
             public MainMenuButton(bool exit)

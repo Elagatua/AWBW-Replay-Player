@@ -3,7 +3,6 @@ using System.Text;
 using AWBWApp.Game.API.Replay;
 using AWBWApp.Game.Game.Building;
 using AWBWApp.Game.Game.Tile;
-using AWBWApp.Game.UI.Editor;
 using osu.Framework.Graphics.Primitives;
 
 namespace AWBWApp.Game.Game.Logic
@@ -164,26 +163,6 @@ namespace AWBWApp.Game.Game.Logic
             }
         }
 
-        public void UpdateEditorMapAtPosition(EditorGameMap map, Vector2I position)
-        {
-            for (int x = position.X - 1; x <= position.X + 1; x++)
-            {
-                if (x < 0 || x >= map.MapSize.X)
-                    continue;
-
-                for (int y = position.Y - 1; y <= position.Y + 1; y++)
-                {
-                    if (y < 0 || y >= map.MapSize.Y)
-                        continue;
-
-                    var tileId = map.GetTileIDAtPosition(new Vector2I(x, y));
-                    var nearby = getNearbyTiles(map, x, y);
-                    var newId = getNewIDForTile(nearby, tileId);
-                    map.ChangeTile(new Vector2I(x, y), tileId, newId);
-                }
-            }
-        }
-
         private NearbyTiles getNearbyTiles(ReplayMap map, int tileIndex, int x, int y)
         {
             var centerTile = map.Ids[tileIndex];
@@ -198,70 +177,6 @@ namespace AWBWApp.Game.Game.Logic
             var southWestTile = x > 0 && y < map.Size.Y - 1 ? map.Ids[tileIndex + map.Size.X - 1] : centerTile;
             var southTile = y < map.Size.Y - 1 ? map.Ids[tileIndex + map.Size.X] : centerTile;
             var southEastTile = x < map.Size.X - 1 && y < map.Size.Y - 1 ? map.Ids[tileIndex + map.Size.X + 1] : centerTile;
-
-            //Todo: May need more special handlings
-            //26 is Hbridge
-            //27 is VBridge
-            //4 is HRiver
-            //5 is VRiver
-
-            if (northWestTile == 26)
-                northWestTile = 5;
-            if (northTile == 26)
-                northTile = 5;
-            if (northEastTile == 26)
-                northEastTile = 5;
-
-            if (southWestTile == 26)
-                southWestTile = 5;
-            if (southTile == 26)
-                southTile = 5;
-            if (southEastTile == 26)
-                southEastTile = 5;
-
-            if (northEastTile == 27)
-                northEastTile = 4;
-            if (eastTile == 27)
-                eastTile = 4;
-            if (southEastTile == 27)
-                southEastTile = 4;
-
-            if (northWestTile == 27)
-                northWestTile = 4;
-            if (westTile == 27)
-                westTile = 4;
-            if (southWestTile == 27)
-                southWestTile = 4;
-
-            return new NearbyTiles
-            {
-                NorthWest = getTerrainTypeFromId(northWestTile),
-                North = getTerrainTypeFromId(northTile),
-                NorthEast = getTerrainTypeFromId(northEastTile),
-
-                West = getTerrainTypeFromId(westTile),
-                East = getTerrainTypeFromId(eastTile),
-
-                SouthWest = getTerrainTypeFromId(southWestTile),
-                South = getTerrainTypeFromId(southTile),
-                SouthEast = getTerrainTypeFromId(southEastTile)
-            };
-        }
-
-        private NearbyTiles getNearbyTiles(EditorGameMap map, int x, int y)
-        {
-            var centerTile = map.GetTileIDAtPosition(new Vector2I(x, y));
-
-            var northWestTile = x > 0 && y > 0 ? map.GetTileIDAtPosition(new Vector2I(x - 1, y - 1)) : centerTile;
-            var northTile = y > 0 ? map.GetTileIDAtPosition(new Vector2I(x, y - 1)) : centerTile;
-            var northEastTile = x < map.MapSize.X - 1 && y > 0 ? map.GetTileIDAtPosition(new Vector2I(x + 1, y - 1)) : centerTile;
-
-            var westTile = x > 0 ? map.GetTileIDAtPosition(new Vector2I(x - 1, y)) : centerTile;
-            var eastTile = x < map.MapSize.X - 1 ? map.GetTileIDAtPosition(new Vector2I(x + 1, y)) : centerTile;
-
-            var southWestTile = x > 0 && y < map.MapSize.Y - 1 ? map.GetTileIDAtPosition(new Vector2I(x - 1, y + 1)) : centerTile;
-            var southTile = y < map.MapSize.Y - 1 ? map.GetTileIDAtPosition(new Vector2I(x, y + 1)) : centerTile;
-            var southEastTile = x < map.MapSize.X - 1 && y < map.MapSize.Y - 1 ? map.GetTileIDAtPosition(new Vector2I(x + 1, y + 1)) : centerTile;
 
             //Todo: May need more special handlings
             //26 is Hbridge

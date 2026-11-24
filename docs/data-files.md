@@ -39,8 +39,6 @@ The **key string is what replays use** for units: `GetUnitDataForUnitName` is
 25 units. `AttackRange` is min–max (`{1,1}` direct, `{2,3}` artillery,
 `{0,0}` unarmed). `MovementType` is the `MovementType` flags enum
 (`LightInf`, `HeavyInf`, `Tire`, `Tread`, `Sea`, `Lander`, `Air`, `Pipe`).
-`Symbol` is used by the map editor, not by replay playback.
-
 | Unit | Id | Cost | Mv | Type | Vis | Fuel | Use | Ammo | Range |
 |---|--:|--:|--:|---|--:|--:|--:|--:|---|
 | Infantry | 1 | 1000 | 3 | LightInf | 2 | 99 | 0 | 0 | 1–1 |

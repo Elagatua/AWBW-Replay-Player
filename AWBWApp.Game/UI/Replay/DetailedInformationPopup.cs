@@ -36,8 +36,8 @@ namespace AWBWApp.Game.UI.Replay
         private UnitPopup unitPopup;
 
         /// <summary>
-        /// The replay being shown, used to recover exact hit points. Null outside a replay, such as in
-        /// the editor, where the popup falls back to the whole number everything else displays.
+        /// The replay being shown, used to recover exact hit points. Null outside a replay, where the
+        /// popup falls back to the whole number everything else displays.
         /// </summary>
         public ReplayController ReplayController
         {

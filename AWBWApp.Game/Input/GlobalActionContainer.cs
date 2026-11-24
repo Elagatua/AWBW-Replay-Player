@@ -61,13 +61,6 @@ namespace AWBWApp.Game.Input
                 new CombinationTrackedKeyBinding(InputKey.G, AWBWGlobalAction.ShowGridLines, SetConfig),
                 new CombinationTrackedKeyBinding(InputKey.F, AWBWGlobalAction.ShowUnitsAndBuildingsInFog, SetConfig),
                 new CombinationTrackedKeyBinding(InputKey.C, AWBWGlobalAction.ShowTileCursor, SetConfig),
-                new CombinationTrackedKeyBinding(new KeyCombination(InputKey.Control, InputKey.Z), AWBWGlobalAction.Undo, SetConfig),
-                new CombinationTrackedKeyBinding(new KeyCombination(InputKey.Control, InputKey.Y), AWBWGlobalAction.Redo, SetConfig),
-                new CombinationTrackedKeyBinding(new KeyCombination(InputKey.Control, InputKey.S), AWBWGlobalAction.Save, SetConfig),
-                new CombinationTrackedKeyBinding(new KeyCombination(InputKey.Control, InputKey.Shift, InputKey.S), AWBWGlobalAction.SaveAs, SetConfig),
-                new CombinationTrackedKeyBinding(InputKey.C, AWBWGlobalAction.ChangeSymmetry, SetConfig),
-                new CombinationTrackedKeyBinding(InputKey.X, AWBWGlobalAction.PickTile, SetConfig),
-                new CombinationTrackedKeyBinding(InputKey.V, AWBWGlobalAction.SwapSelectedCountries, SetConfig),
             };
 
         protected override IEnumerable<Drawable> KeyBindingInputQueue
