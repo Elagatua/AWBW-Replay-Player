@@ -232,13 +232,13 @@ namespace AWBWApp.Game.Game.Logic
         {
             InfoPopup = popup;
 
-            //Null in the editor, where there is no replay to read exact hit points out of.
+            //Null outside a replay, where there are no exact hit points to read out of.
             popup.ReplayController = ReplayController;
         }
 
         /// <summary>
-        /// Hands the map the tooltip to drive while the attack calculator gesture is held. Never set
-        /// in the editor, which is what keeps the gesture out of it entirely.
+        /// Hands the map the tooltip to drive while the attack calculator gesture is held. Left unset
+        /// outside a replay, which is what keeps the gesture out of those cases entirely.
         /// </summary>
         public void SetAttackCalculatorPopup(AttackCalculatorPopup popup)
         {
@@ -407,7 +407,7 @@ namespace AWBWApp.Game.Game.Logic
 
         private void updateAttackCalculator(Vector2 mousePosition)
         {
-            //The editor never gets a popup, so the gesture does not exist there.
+            //Without a popup there is no gesture at all.
             if (AttackPopup == null)
                 return;
 
@@ -1200,7 +1200,7 @@ namespace AWBWApp.Game.Game.Logic
                 movementRange += action?.MovementRangeIncrease ?? 0;
             }
             else
-                dayToDay = COStorage.GetCOByName("No CO").DayToDayPower; //In case this is triggered in cases like the editor
+                dayToDay = COStorage.GetCOByName("No CO").DayToDayPower; //In case this is triggered outside a replay
 
             void addTileToQueueIfPossible(Vector2I position, int movement)
             {

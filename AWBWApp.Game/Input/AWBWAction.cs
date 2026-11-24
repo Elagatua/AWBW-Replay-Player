@@ -10,13 +10,5 @@
         ShowUnitsAndBuildingsInFog,
         ShowGridLines,
         ShowTileCursor,
-
-        Save,
-        SaveAs,
-        Undo,
-        Redo,
-        ChangeSymmetry,
-        PickTile,
-        SwapSelectedCountries
     }
 }
