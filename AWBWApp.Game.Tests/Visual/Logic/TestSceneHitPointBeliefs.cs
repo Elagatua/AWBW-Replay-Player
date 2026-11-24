@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using AWBWApp.Game.API.Replay;
 using AWBWApp.Game.API.Replay.Actions;
@@ -285,6 +285,95 @@ namespace AWBWApp.Game.Tests.Visual.Logic
                 Assert.That(belief.Minimum, Is.EqualTo(90));
                 return true;
             });
+        }
+
+        /// <summary>
+        /// Walking somewhere is not news about a unit's hit points.
+        /// </summary>
+        /// <remarks>
+        /// Reported from a real game: a tank whose hit points had been narrowed to 41 to 44 moved,
+        /// was not attacked, and came out of it believed to be somewhere in 41 to 50. A move
+        /// carries the unit's hit points as the board shows them, so applying it writes a whole
+        /// number over the exact one the turn began with - 4.4 becomes 5 - and anything watching
+        /// the stored value for changes sees that as the unit having been hit.
+        /// </remarks>
+        [Test]
+        public void TestMovingIsNotNewsAboutHitPoints()
+        {
+            AddStep("A tank trades blows, then walks away next turn", () =>
+            {
+                var data = CreateBasicReplayData(2);
+
+                var first = CreateBasicTurnData(data);
+                data.TurnData.Add(first);
+
+                var attacker = CreateBasicReplayUnit(0, 0, "Tank", new Vector2I(1, 1));
+                var defender = CreateBasicReplayUnit(1, 1, "Tank", new Vector2I(2, 1));
+
+                first.ReplayUnit.Add(attacker.ID, attacker);
+                first.ReplayUnit.Add(defender.ID, defender);
+
+                var attack = new AttackUnitAction
+                {
+                    Attacker = attacker.Clone(),
+                    Defender = defender.Clone(),
+                    PowerChanges = new List<AttackUnitAction.COPowerChange>()
+                };
+
+                //What the board shows once the shooting stops. The counter is what narrows the
+                //attacker down, and it is the attacker this test is about.
+                attack.Attacker.Ammo = attacker.Ammo - 1;
+                attack.Attacker.HitPoints = 8;
+                attack.Defender.HitPoints = 5;
+
+                first.Actions.Add(attack);
+
+                //The figures the replay privately holds afterwards, both inside what the tracker
+                //should have worked out by now.
+                var second = CreateBasicTurnData(data, 1);
+                data.TurnData.Add(second);
+
+                addSnapshot(second, attacker, 7.8f);
+                addSnapshot(second, defender, 4.6f);
+
+                //And now the tank moves, carrying its hit points as a whole number.
+                var third = CreateBasicTurnData(data);
+                data.TurnData.Add(third);
+
+                addSnapshot(third, attacker, 7.8f);
+                addSnapshot(third, defender, 4.6f);
+
+                var moved = attacker.Clone();
+                moved.Position = new Vector2I(1, 3);
+                moved.HitPoints = 8;
+
+                third.Actions.Add(new MoveUnitAction { Unit = moved, Distance = 2, Path = new UnitPosition[0] });
+
+                ReplayController.RunSetupActionsForTest(data, CreateBasicMap(5, 5));
+            });
+
+            AddAssert("The move tells us nothing new", () =>
+            {
+                var before = ReplayController.GetHitPointBelief(0, 2, -1);
+                var after = ReplayController.GetHitPointBelief(0, 2, 0);
+
+                Assert.That(before, Is.Not.Null);
+                Assert.That(after, Is.Not.Null);
+
+                Assert.That(after.Minimum, Is.EqualTo(before.Minimum), $"the move widened {before} to {after}");
+                Assert.That(after.Maximum, Is.EqualTo(before.Maximum), $"the move widened {before} to {after}");
+
+                //And it was narrower than the tenth to begin with, or this would prove nothing.
+                Assert.That(before.Maximum - before.Minimum, Is.LessThan(9), $"nothing had been worked out to lose: {before}");
+                return true;
+            });
+        }
+
+        private static void addSnapshot(TurnData turn, ReplayUnit unit, float hitPoints)
+        {
+            var copy = unit.Clone();
+            copy.HitPoints = hitPoints;
+            turn.ReplayUnit.Add(copy.ID, copy);
         }
 
         /// <summary>

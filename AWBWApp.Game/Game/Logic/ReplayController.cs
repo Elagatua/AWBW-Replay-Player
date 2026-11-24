@@ -519,7 +519,6 @@ namespace AWBWApp.Game.Game.Logic
                 buildingDiscoveryController.RegisterNewTurn(setupContext);
 
                 var hitPointsBefore = new Dictionary<long, float>();
-                var changedThisAction = new HashSet<long>();
 
                 //Before anything syncs the context to it, so that the snapshot can still be told
                 //apart from what the previous turn's actions added up to.
@@ -563,8 +562,8 @@ namespace AWBWApp.Game.Game.Logic
                         action.SetupAndUpdate(this, setupContext);
                         action.SuccessfullySetup = true;
 
-                        recordHitPointChanges(changesThisTurn, hitPointsBefore, setupContext.Units, j, changedThisAction);
-                        beliefTracker.ObserveUnits(setupContext, changedThisAction, i, j);
+                        recordHitPointChanges(changesThisTurn, hitPointsBefore, setupContext.Units, j);
+                        beliefTracker.ObserveUnits(setupContext, i, j);
                     }
                 }
                 catch (Exception e)
@@ -582,10 +581,8 @@ namespace AWBWApp.Game.Game.Logic
         /// Notes every unit whose hit points this action altered, so that <see cref="TryGetExactHitPoints"/>
         /// can later tell whether a turn's starting snapshot still describes a unit.
         /// </summary>
-        private static void recordHitPointChanges(Dictionary<long, (int First, int Last)> changes, Dictionary<long, float> before, Dictionary<long, ReplayUnit> after, int actionIndex, HashSet<long> changedThisAction)
+        private static void recordHitPointChanges(Dictionary<long, (int First, int Last)> changes, Dictionary<long, float> before, Dictionary<long, ReplayUnit> after, int actionIndex)
         {
-            changedThisAction.Clear();
-
             foreach (var unit in after)
             {
                 //A unit that did not exist before this action counts as changed: its hit points did
@@ -593,7 +590,6 @@ namespace AWBWApp.Game.Game.Logic
                 if (before.TryGetValue(unit.Key, out var previous) && previous == (unit.Value.HitPoints ?? 0))
                     continue;
 
-                changedThisAction.Add(unit.Key);
                 changes[unit.Key] = changes.TryGetValue(unit.Key, out var range) ? (range.First, actionIndex) : (actionIndex, actionIndex);
             }
         }

@@ -289,6 +289,17 @@ that this feature already fell into once.
   number, rounded up. A unit really holding 78 is reported as `8`.
 - **A turn's opening snapshot** carries the real value, `7.8`.
 
+That is also why nothing inside a turn watches the stored figure for changes. A
+unit that walks across the map goes from 7.8 to 8 without being touched, because
+the move carries its hit points as the board shows them and writing the move
+down writes that over the exact value. Reading that as damage throws away
+everything worked out about the unit, which is what it did.
+
+Nothing is lost by not watching. A change the board shows contradicts the whole
+belief - a belief lives inside one tenth - so ruling values out falls back to the
+displayed figure on its own. A change the board does not show is caught at the
+head of the next turn.
+
 So any comparison that spans the boundary has to round *both* sides first.
 Comparing them raw makes every damaged unit in the game look like it changed on
 every turn, which fires the safety net above, which throws away everything that
