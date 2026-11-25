@@ -247,6 +247,9 @@ jobs:
     needs: [ version, test ]
     runs-on: ubuntu-latest
 
+    env:
+      APP: AWBW Replay Player.app
+
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET
@@ -266,7 +269,6 @@ jobs:
 
     - name: Build the app bundle
       run: |
-        APP="AWBW Replay Player.app"
         mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
         cp -R publish/. "$APP/Contents/MacOS/"
         cp AWBWApp.Resources/Textures/Icon/ICO256.icns "$APP/Contents/Resources/game.icns"
@@ -298,6 +300,62 @@ jobs:
         # travel all the way to someone's Mac before anything noticed.
         python3 -c "import plistlib, sys; plistlib.load(open(sys.argv[1], 'rb'))" "$APP/Contents/Info.plist"
 
+    # An unsigned bundle is not merely untrusted. Gatekeeper has nothing to assess at all, and so
+    # refuses a quarantined copy outright with "is damaged and can't be opened" - which, unlike the
+    # familiar warning, no amount of right-clicking gets past. An ad-hoc signature carries no
+    # certificate and earns no trust whatsoever, but it gives Gatekeeper something to read, which
+    # turns that refusal into the ordinary "unidentified developer" prompt a person can accept.
+    # Signing for real needs an Apple Developer account. This needs nothing.
+    #
+    # rcodesign reimplements codesign in Rust, so this stays on the Linux runner. It is pinned to a
+    # tagged release and checked against the hash published beside it, for the same reason
+    # appimagetool is pinned: a download that quietly answered with something else should fail here
+    # rather than ship.
+    - name: Sign the app bundle
+      run: |
+        tool=0.29.0
+        archive="apple-codesign-$tool-x86_64-unknown-linux-musl.tar.gz"
+        curl -fsSL -o "$archive" \
+          "https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F$tool/$archive"
+        echo "dbe85cedd8ee4217b64e9a0e4c2aef92ab8bcaaa41f20bde99781ff02e600002  $archive" | sha256sum -c -
+        tar xzf "$archive" --strip-components=1 \
+          "apple-codesign-$tool-x86_64-unknown-linux-musl/rcodesign"
+
+        # Naming no certificate is what makes it ad-hoc, and the bundle is rewritten in place.
+        # Recursion is on by default, so the dylibs sitting beside the executable are signed too.
+        # The hardened runtime is deliberately not asked for: it buys nothing without notarization,
+        # and it would stop .NET's JIT dead.
+        ./rcodesign sign "$APP"
+
+        # Signing rewrites the executable, and whether the mode survives that is not something this
+        # build should have to assume.
+        chmod +x "$APP/Contents/MacOS/AWBW Replay Player"
+
+        # Stands in for codesign -dv, which is only on macOS. A sign that found nothing to do still
+        # exits zero, so this reads the Mach-O and insists the signature really landed in it.
+        cat > signed.py <<'PY'
+        import struct, sys
+
+        path = sys.argv[1]
+        with open(path, 'rb') as f:
+            magic, _cpu, _subcpu, _filetype, ncmds = struct.unpack('<5I', f.read(20))
+            if magic != 0xfeedfacf:
+                sys.exit(f'{path}: not a thin 64-bit Mach-O (magic {magic:#x})')
+            f.seek(32)  # past the rest of mach_header_64
+            for _ in range(ncmds):
+                cmd, size = struct.unpack('<2I', f.read(8))
+                if cmd == 0x1d:  # LC_CODE_SIGNATURE
+                    _dataoff, datasize = struct.unpack('<2I', f.read(8))
+                    print(f'{path}: signed, {datasize} bytes of signature')
+                    break
+                f.seek(size - 8, 1)
+            else:
+                sys.exit(f'{path}: no LC_CODE_SIGNATURE, so the signing did nothing')
+        PY
+        python3 signed.py "$APP/Contents/MacOS/AWBW Replay Player"
+
+    - name: Pack the app bundle
+      run: |
         # -y keeps the symlinks inside the bundle as symlinks. Without it they are followed and
         # copied, which both bloats the archive and leaves a bundle macOS will not open. This is
         # what ditto -c -k would do on a Mac.

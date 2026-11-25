@@ -210,27 +210,69 @@ the repository in `Contents/Resources`, and an `Info.plist` naming the
 executable.
 
 **It is built on a Linux runner.** Nothing about it needs a Mac - the publish is
-a cross-compile, a bundle is a directory with a plist in it, and the one step
-that would genuinely require macOS is signing, which is not happening anyway.
-What a macOS runner does bring is a queue: GitHub's arm64 pool is capacity
+a cross-compile, a bundle is a directory with a plist in it, and even the
+signing is done by a reimplementation of `codesign` that runs anywhere. What a
+macOS runner does bring is a queue: GitHub's arm64 pool is capacity
 constrained, and the first release that asked for one never got it. The job sat
 queued for fifteen minutes and was cancelled with *"The job was not acquired by
 Runner of type hosted"*.
 
-Two macOS tools had to be replaced, and both matter more than they look.
+Three macOS tools had to be replaced, and each matters more than it looks.
 `plutil -lint` becomes a line of Python, so a malformed plist is still caught
-here rather than on someone's Mac. `ditto -c -k` becomes `zip -y`, where the
-`-y` is the whole point: without it the symlinks inside the bundle are followed
-and copied, leaving an archive that is both larger and no longer something macOS
-will open.
-
-**It is not signed.** Nobody here has an Apple Developer account, so Gatekeeper
-will refuse to open it until the person who downloaded it right-clicks and
-chooses Open, or clears the quarantine attribute by hand. Upstream's bundle is
-in the same position.
+here rather than on someone's Mac. `codesign -dv` becomes a few more lines of
+it, reading the Mach-O directly to confirm a signature landed. `ditto -c -k`
+becomes `zip -y`, where the `-y` is the whole point: without it the symlinks
+inside the bundle are followed and copied, leaving an archive that is both
+larger and no longer something macOS will open.
 
 It is built for Intel, which Apple silicon runs under Rosetta. A universal
 bundle would mean publishing twice and splicing the two binaries together.
+
+### Signing
+
+**The bundle is ad-hoc signed, which is not the same as signed.** An ad-hoc
+signature carries no certificate and so proves nothing at all about who built
+the app. It is still worth having, because having none is worse than being
+untrusted:
+
+| What the bundle carries | What the person who downloaded it sees |
+|---|---|
+| No signature | *"is damaged and can't be opened"*, and it will not launch |
+| Ad-hoc signature | *"cannot be opened because the developer cannot be verified"*, which **Open Anyway** gets past |
+| Developer ID, notarized and stapled | It opens |
+
+The first row is the one that catches people out, because the usual advice -
+right-click and choose Open - does nothing for it. Gatekeeper has no signature
+to assess, so there is no verdict to override. The only fix on that side is
+clearing the quarantine attribute by hand:
+
+```
+xattr -dr com.apple.quarantine "/Applications/AWBW Replay Player.app"
+```
+
+Signing is done by [rcodesign](https://github.com/indygreg/apple-platform-rs),
+which reimplements `codesign` in Rust and so runs on the Linux runner with
+everything else. Naming no certificate is what makes the signature ad-hoc, and
+recursion into the dylibs sitting beside the executable is on by default. The
+hardened runtime is deliberately *not* asked for: it is only required for
+notarization, and it would stop .NET's JIT dead.
+
+The job then does two things, both because signing rewrites the executable in
+place. It re-applies the executable bit rather than assume it survived, and it
+reads the Mach-O load commands looking for `LC_CODE_SIGNATURE`, failing the
+build when it is absent. **`rcodesign sign` exits zero whether or not it found
+anything to sign**, so without that check a release could quietly slip back to
+the first row of the table and nothing here would say so.
+
+The step up from this - a real **Developer ID** certificate, notarization and
+stapling - needs an Apple Developer Program membership at $99 a year, which
+nobody here has. It would also have to move the job to a macOS runner, since
+`notarytool` and `stapler` have no equivalent that runs anywhere else.
+Upstream's bundle is not signed at all.
+
+The table is what Gatekeeper is documented to do, not something a download from
+here has been checked against. The ad-hoc row is worth confirming on a real Mac
+the first time a release goes out with it.
 
 ## Only Windows updates itself
 
