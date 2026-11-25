@@ -230,64 +230,67 @@ bundle would mean publishing twice and splicing the two binaries together.
 
 ### Signing
 
-**The bundle is ad-hoc signed, which is not the same as signed.** An ad-hoc
-signature carries no certificate and so proves nothing at all about who built
-the app. It is still worth having, because the state below it is worse than
-being untrusted:
+**The bundle is ad-hoc signed, and that does not get it past Gatekeeper.** This
+was tried, shipped in v0.14.9, and tested on a Mac: a downloaded copy is still
+refused with *"is damaged and can't be opened"*. An ad-hoc signature carries no
+certificate, and for a quarantined app Gatekeeper treats that as no valid
+signature at all. Expecting it to earn the softer *"developer cannot be
+verified"* prompt was simply wrong.
 
 | What the bundle carries | What the person who downloaded it sees |
 |---|---|
-| A signed executable in an unsealed bundle | *"is damaged and can't be opened"*, and it will not launch |
-| An ad-hoc signed bundle | *"cannot be opened because the developer cannot be verified"*, which **Open Anyway** gets past |
-| Developer ID, notarized and stapled | It opens |
+| A signed executable in an unsealed bundle, up to v0.14.8 | *"is damaged and can't be opened"* |
+| An ad-hoc signed bundle, from v0.14.9 | the same thing |
+| Developer ID, notarized and stapled | it opens |
 
-The first row is what shipped up to and including v0.14.8, and it is the one
-that catches people out, because the usual advice - right-click and choose Open
-- does nothing for it. The only fix on that side is clearing the quarantine
-attribute by hand:
+So the only thing that helps a person today is clearing the quarantine
+attribute by hand, and on macOS 15 and later that is the *only* route, because
+the right-click-and-choose-Open bypass no longer exists:
 
 ```
 xattr -dr com.apple.quarantine "/Applications/AWBW Replay Player.app"
 ```
 
-**It was never the case that nothing was signed.** `dotnet publish` ad-hoc
-signs the apphost itself, so the executable inside v0.14.8 already carried a
-1112-byte signature. What was missing was everything around it:
+**The signing step stays anyway**, for two reasons that have nothing to do with
+that dialog.
 
-- `Contents/_CodeSignature/CodeResources`, the seal over the rest of the
-  bundle. Gatekeeper assesses the **bundle**, and a bundle with no seal does
-  not validate at all
-- an identifier that matches. The apphost signs itself as `apphost`, never as
-  the `CFBundleIdentifier` in `Info.plist`
+The first is that what shipped before it was wrong on its own terms. It was
+never the case that nothing was signed: `dotnet publish` ad-hoc signs the
+apphost itself, so the executable inside v0.14.8 already carried a 1112-byte
+signature. What was missing was everything around it - no
+`Contents/_CodeSignature/CodeResources` sealing the bundle, and an identifier
+of `apphost` rather than the `CFBundleIdentifier` in `Info.plist`. The same
+executable in v0.14.9 carries 6144 bytes signed as
+`com.github.elagatua.awbwreplayplayer` with `CodeResources` beside it, and its
+code directory's Info.plist and CodeResources hashes match the files they seal.
 
-Signing the bundle settles both. The same executable in v0.14.9 carries 6144
-bytes signed as `com.github.elagatua.awbwreplayplayer`, with `CodeResources`
-beside it. Unzipping a release asset and reading the Mach-O is how to check
-that, and it does not need a Mac.
+The second is that it is the groundwork for the only real fix. Going from here
+to a **Developer ID** certificate is a matter of naming one, not of building the
+step: `--p12-file` and `--code-signature-flags runtime` in place of no
+arguments. What that additionally needs is an Apple Developer Program
+membership at $99 a year, which nobody here has, and a macOS runner, because
+`notarytool` and `stapler` have no equivalent that runs anywhere else. Note
+that the hardened runtime `runtime` flag is **required** for notarization and
+will stop .NET's JIT dead unless `com.apple.security.cs.allow-jit` and
+`com.apple.security.cs.allow-unsigned-executable-memory` go in an entitlements
+file alongside it. That is why it is not asked for now.
 
 Signing is done by [rcodesign](https://github.com/indygreg/apple-platform-rs),
 which reimplements `codesign` in Rust and so runs on the Linux runner with
 everything else. Naming no certificate is what makes the signature ad-hoc, and
-recursion into the dylibs sitting beside the executable is on by default. The
-hardened runtime is deliberately *not* asked for: it is only required for
-notarization, and it would stop .NET's JIT dead.
+recursion into the dylibs sitting beside the executable is on by default.
 
 The job then does two things, both because signing rewrites the executable in
 place. It re-applies the executable bit rather than assume it survived, and it
 reads the Mach-O load commands looking for `LC_CODE_SIGNATURE`, failing the
 build when it is absent. **`rcodesign sign` exits zero whether or not it found
-anything to sign**, so without that check a release could quietly slip back to
-the first row of the table and nothing here would say so.
+anything to sign**, so without that check the signing could quietly stop
+happening and nothing here would say so.
 
-The step up from this - a real **Developer ID** certificate, notarization and
-stapling - needs an Apple Developer Program membership at $99 a year, which
-nobody here has. It would also have to move the job to a macOS runner, since
-`notarytool` and `stapler` have no equivalent that runs anywhere else.
+None of this can be checked by running the app, since the runner is Linux. It
+can all be checked by unzipping a release asset and reading the Mach-O load
+commands and the code directory out of the executable, which needs no Mac.
 Upstream's bundle is not signed at all.
-
-The first row of the table is measured; the second is what Gatekeeper is
-documented to do, and has not been confirmed against a download from here. It
-is worth asking whoever reported the problem to check it on a real Mac.
 
 ## Only Windows updates itself
 

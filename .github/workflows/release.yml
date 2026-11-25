@@ -300,14 +300,15 @@ jobs:
         # travel all the way to someone's Mac before anything noticed.
         python3 -c "import plistlib, sys; plistlib.load(open(sys.argv[1], 'rb'))" "$APP/Contents/Info.plist"
 
-    # dotnet publish ad-hoc signs the apphost on its own, so the executable was never unsigned.
-    # What it cannot do is seal the bundle around it, and Gatekeeper assesses the bundle: without
-    # Contents/_CodeSignature/CodeResources, and with the apphost calling itself "apphost" rather
-    # than the Info.plist identifier, a quarantined copy is refused outright with "is damaged and
-    # can't be opened" - which, unlike the familiar warning, no amount of right-clicking gets past.
-    # Signing the bundle here is still ad-hoc and so still earns no trust, but it gives Gatekeeper
-    # something that validates, which turns that refusal into the ordinary unidentified-developer
-    # prompt a person can accept. Signing for real needs an Apple Developer account.
+    # This does NOT get the bundle past Gatekeeper, and is not meant to any more: a quarantined
+    # copy is still refused with "is damaged and can't be opened", because an ad-hoc signature
+    # carries no certificate and Gatekeeper treats that as no signature at all. Tested on a Mac
+    # with v0.14.9. Only a Developer ID certificate plus notarization changes that dialog.
+    #
+    # It is here because what shipped before it was wrong on its own terms. dotnet publish ad-hoc
+    # signs the apphost, so the executable was never unsigned - but nothing sealed the bundle
+    # around it, and the apphost calls itself "apphost" rather than the Info.plist identifier.
+    # Signing the bundle fixes both, and leaves the step a certificate can simply be named in.
     #
     # rcodesign reimplements codesign in Rust, so this stays on the Linux runner. It is pinned to a
     # tagged release and checked against the hash published beside it, for the same reason
