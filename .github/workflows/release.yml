@@ -300,12 +300,14 @@ jobs:
         # travel all the way to someone's Mac before anything noticed.
         python3 -c "import plistlib, sys; plistlib.load(open(sys.argv[1], 'rb'))" "$APP/Contents/Info.plist"
 
-    # An unsigned bundle is not merely untrusted. Gatekeeper has nothing to assess at all, and so
-    # refuses a quarantined copy outright with "is damaged and can't be opened" - which, unlike the
-    # familiar warning, no amount of right-clicking gets past. An ad-hoc signature carries no
-    # certificate and earns no trust whatsoever, but it gives Gatekeeper something to read, which
-    # turns that refusal into the ordinary "unidentified developer" prompt a person can accept.
-    # Signing for real needs an Apple Developer account. This needs nothing.
+    # dotnet publish ad-hoc signs the apphost on its own, so the executable was never unsigned.
+    # What it cannot do is seal the bundle around it, and Gatekeeper assesses the bundle: without
+    # Contents/_CodeSignature/CodeResources, and with the apphost calling itself "apphost" rather
+    # than the Info.plist identifier, a quarantined copy is refused outright with "is damaged and
+    # can't be opened" - which, unlike the familiar warning, no amount of right-clicking gets past.
+    # Signing the bundle here is still ad-hoc and so still earns no trust, but it gives Gatekeeper
+    # something that validates, which turns that refusal into the ordinary unidentified-developer
+    # prompt a person can accept. Signing for real needs an Apple Developer account.
     #
     # rcodesign reimplements codesign in Rust, so this stays on the Linux runner. It is pinned to a
     # tagged release and checked against the hash published beside it, for the same reason

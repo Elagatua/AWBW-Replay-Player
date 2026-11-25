@@ -232,23 +232,38 @@ bundle would mean publishing twice and splicing the two binaries together.
 
 **The bundle is ad-hoc signed, which is not the same as signed.** An ad-hoc
 signature carries no certificate and so proves nothing at all about who built
-the app. It is still worth having, because having none is worse than being
-untrusted:
+the app. It is still worth having, because the state below it is worse than
+being untrusted:
 
 | What the bundle carries | What the person who downloaded it sees |
 |---|---|
-| No signature | *"is damaged and can't be opened"*, and it will not launch |
-| Ad-hoc signature | *"cannot be opened because the developer cannot be verified"*, which **Open Anyway** gets past |
+| A signed executable in an unsealed bundle | *"is damaged and can't be opened"*, and it will not launch |
+| An ad-hoc signed bundle | *"cannot be opened because the developer cannot be verified"*, which **Open Anyway** gets past |
 | Developer ID, notarized and stapled | It opens |
 
-The first row is the one that catches people out, because the usual advice -
-right-click and choose Open - does nothing for it. Gatekeeper has no signature
-to assess, so there is no verdict to override. The only fix on that side is
-clearing the quarantine attribute by hand:
+The first row is what shipped up to and including v0.14.8, and it is the one
+that catches people out, because the usual advice - right-click and choose Open
+- does nothing for it. The only fix on that side is clearing the quarantine
+attribute by hand:
 
 ```
 xattr -dr com.apple.quarantine "/Applications/AWBW Replay Player.app"
 ```
+
+**It was never the case that nothing was signed.** `dotnet publish` ad-hoc
+signs the apphost itself, so the executable inside v0.14.8 already carried a
+1112-byte signature. What was missing was everything around it:
+
+- `Contents/_CodeSignature/CodeResources`, the seal over the rest of the
+  bundle. Gatekeeper assesses the **bundle**, and a bundle with no seal does
+  not validate at all
+- an identifier that matches. The apphost signs itself as `apphost`, never as
+  the `CFBundleIdentifier` in `Info.plist`
+
+Signing the bundle settles both. The same executable in v0.14.9 carries 6144
+bytes signed as `com.github.elagatua.awbwreplayplayer`, with `CodeResources`
+beside it. Unzipping a release asset and reading the Mach-O is how to check
+that, and it does not need a Mac.
 
 Signing is done by [rcodesign](https://github.com/indygreg/apple-platform-rs),
 which reimplements `codesign` in Rust and so runs on the Linux runner with
@@ -270,9 +285,9 @@ nobody here has. It would also have to move the job to a macOS runner, since
 `notarytool` and `stapler` have no equivalent that runs anywhere else.
 Upstream's bundle is not signed at all.
 
-The table is what Gatekeeper is documented to do, not something a download from
-here has been checked against. The ad-hoc row is worth confirming on a real Mac
-the first time a release goes out with it.
+The first row of the table is measured; the second is what Gatekeeper is
+documented to do, and has not been confirmed against a download from here. It
+is worth asking whoever reported the problem to check it on a real Mac.
 
 ## Only Windows updates itself
 
