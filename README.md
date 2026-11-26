@@ -30,6 +30,23 @@ The current version is stable and has many of the basic features. Unfinished asp
 
 Code quality of this repo is not great yet. The aim will be to improve code quality after making sure things work.
 
+## Opening it on macOS
+
+macOS refuses the download with *"AWBW Replay Player.app is damaged and can't be
+opened."* The file is not damaged. That dialog is what Gatekeeper says about any app
+that is not signed with an Apple Developer ID certificate, which this one is not.
+
+Removing the quarantine flag it was given at download time lets it open:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/AWBW Replay Player.app"
+```
+
+Use whatever path the app actually sits at, and expect to do this once per download.
+There is no way around it from inside the app: the old right-click-and-choose-Open
+bypass was removed in macOS 15, and only a paid Developer ID plus notarization makes
+the dialog go away. See [docs/releases.md](docs/releases.md) for the detail.
+
 ## Credits
 
 * Built using the osu-framework: https://github.com/ppy/osu-framework
